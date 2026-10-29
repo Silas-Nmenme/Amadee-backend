@@ -1,0 +1,1 @@
+export function errorHandler(err,_req,res,_next){console.error(err?.message||err);if(res.headersSent)return;res.status(err.status||500).json({message:err.status?err.message:"An unexpected server error occurred."})}
