@@ -117,11 +117,6 @@ async function startServer() {
     app.listen(port, () => {
       console.log(`Amadee Stiches API running on port ${port}`);
       console.log(`Health check: http://localhost:${port}/api/health`);
-      console.log(`Products API: http://localhost:${port}/api/products`);
-      console.log(`Admin API: http://localhost:${port}/api/admin`);
-      console.log(
-        `Admin Products API: http://localhost:${port}/api/admin/products`
-      );
       console.log(
         `Frontend origin: ${allowedOrigin || "Not configured"}`
       );
