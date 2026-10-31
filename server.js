@@ -80,11 +80,10 @@ app.use(cookieParser());
 // Rate-limit API requests.
 app.use("/api", apiLimiter);
 
-// Health-check endpoint.
-app.get("/api/health", (_req, res) => {
+app.get("/", (req, res) => {
   res.status(200).json({
-    status: "ok",
-    message: "Amadee Stiches API is running.",
+    success: true,
+    message: "Backend API is running successfully",
   });
 });
 
@@ -116,7 +115,6 @@ async function startServer() {
 
     app.listen(port, () => {
       console.log(`Amadee Stiches API running on port ${port}`);
-      console.log(`Health check: http://localhost:${port}/api/health`);
       console.log(
         `Frontend origin: ${allowedOrigin || "Not configured"}`
       );
