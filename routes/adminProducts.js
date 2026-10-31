@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import { z } from "zod";
 
@@ -7,7 +6,7 @@ import {
   createProduct,
   updateProduct,
   deactivateProduct,
-} from "../controllers/productController.js";
+} from "../controllers/productcontroller.js";
 
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
