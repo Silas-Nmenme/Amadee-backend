@@ -1,4 +1,3 @@
-
 import Product from "../models/Product.js";
 
 const escapeRegExp = (value) =>

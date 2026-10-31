@@ -1,4 +1,3 @@
-
 import Message from "../models/Message.js";
 import { sendMail } from "../services/mailer.js";
 

@@ -1,8 +1,7 @@
-
 const BRAND = "Amadee-Stiches";
 
 const WEBSITE_URL =
-  process.env.STOREFRONT_URL || "http://localhost:5500";
+  process.env.STOREFRONT_URL || "https://amadeestiches.netlify.app";
 
 /* -------------------------------------------------------------------------- */
 /* HTML HELPERS                                                               */
