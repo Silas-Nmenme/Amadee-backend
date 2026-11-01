@@ -15,10 +15,15 @@
         <button id="account-signout" class="button button-outline" type="button">Sign out</button>
       </aside>
       <form id="profile-form" class="help-block">
-        <h2>Your profile</h2><label for="full-name">Full name</label><input id="full-name" name="fullName" autocomplete="name" maxlength="80" required>
+        <h2>Your profile</h2><label for="full-name">Full name</label><input id="full-name" name="name" autocomplete="name" minlength="2" maxlength="80" required>
         <button class="button" type="submit">Save profile</button>
       </form>
     </div>
+    <section class="help-block" aria-labelledby="orders-title">
+      <h2 id="orders-title">Your orders</h2>
+      <button id="refresh-orders" class="button button-outline" type="button">Refresh orders</button>
+      <div id="orders-list" class="moderation-list"></div>
+    </section>
     <section id="moderation" class="help-block" hidden>
       <p class="eyebrow">Administrator</p><h2>Review approval</h2><p>Publish genuine customer experiences. Rejected reviews are removed.</p>
       <button id="refresh-reviews" class="button button-outline" type="button">Refresh pending reviews</button><div id="moderation-list" class="moderation-list"></div>

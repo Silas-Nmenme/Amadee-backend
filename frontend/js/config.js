@@ -1,9 +1,17 @@
-const configuredApiUrl = (window.AMADEE_API_URL || "https://amadee-backend.vercel.app")
+const isLocalDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+const configuredApiUrl = (window.AMADEE_API_URL || (isLocalDevelopment ? "http://localhost:3000/api" : "/api"))
   .replace(/\/+$/, "");
 
 export const API_BASE_URL = configuredApiUrl.endsWith("/api")
   ? configuredApiUrl
   : `${configuredApiUrl}/api`;
 
-// Public shop contact used by the storefront and WhatsApp checkout.
-export function getWhatsappNumber() { return "2349034063970"; }
+let whatsappNumber = "2349034063970";
+
+export function setShopWhatsappNumber(value) {
+  if (typeof value === "string" && /^\d{7,20}$/.test(value)) {
+    whatsappNumber = value;
+  }
+}
+
+export function getWhatsappNumber() { return whatsappNumber; }

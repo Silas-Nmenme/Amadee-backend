@@ -17,7 +17,11 @@ export async function api(path, options={}) {
     headers
   });
   const data = await response.json().catch(()=>({message:"Unexpected server response"}));
-  if(!response.ok) throw new Error(data.message || "Request failed");
+  if(!response.ok) {
+    const error = new Error(data.message || "Request failed");
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 export const byId = id => document.getElementById(id);

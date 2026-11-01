@@ -1,12 +1,11 @@
-import { loadIdentity } from './modules/identity.js';
+import { api } from './modules/utils.js';
 
 const page = document.body.dataset.authPage;
 const form = document.getElementById('auth-form');
 const submit = form.querySelector('[type="submit"]');
 const status = document.getElementById('auth-status');
 const actions = document.getElementById('account-actions');
-let identity;
-let inviteToken;
+const verificationPanel = document.getElementById('verification-panel');
 let ready = false;
 
 function message(text, error = false) {
@@ -22,13 +21,23 @@ function showAccount(text) {
   actions.hidden = false;
 }
 
-function showError(error) {
-  const text = error?.status === 401
-    ? 'We couldn’t sign you in. Check your email and password, or request a new reset link.'
-    : error?.name === 'MissingIdentityError'
-      ? 'Account services are temporarily unavailable. Please try again later.'
-      : error?.message || 'Something went wrong. Please try again.';
-  message(text, true);
+function showVerification(email, text) {
+  form.hidden = true;
+  verificationPanel.hidden = false;
+  verificationPanel.elements.email.value = email;
+  message(text);
+}
+
+function strongPassword(password) {
+  return password.length >= 10 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password);
+}
+
+function setBusy(button, busy, label) {
+  button.disabled = busy;
+  if (label) button.textContent = busy ? 'Please wait…' : label;
 }
 
 for (const toggle of document.querySelectorAll('.password-toggle')) {
@@ -43,109 +52,171 @@ for (const toggle of document.querySelectorAll('.password-toggle')) {
 
 const confirm = form.elements.confirmPassword;
 if (confirm) {
-  const check = () => confirm.setCustomValidity(confirm.value !== form.elements.password.value ? 'Passwords must match.' : '');
+  const check = () => confirm.setCustomValidity(
+    confirm.value !== form.elements.password.value ? 'Passwords must match.' : ''
+  );
   confirm.addEventListener('input', check);
   form.elements.password.addEventListener('input', check);
 }
+
 if (form.elements.name) {
   form.elements.name.addEventListener('input', () => {
-    form.elements.name.setCustomValidity(form.elements.name.value.trim() ? '' : 'Enter your full name.');
+    form.elements.name.setCustomValidity(
+      form.elements.name.value.trim() ? '' : 'Enter your full name.'
+    );
   });
 }
 
-form.addEventListener('submit', async (event) => {
+form.addEventListener('submit', async event => {
   event.preventDefault();
+  if (confirm) {
+    confirm.setCustomValidity(
+      confirm.value !== form.elements.password.value ? 'Passwords must match.' : ''
+    );
+  }
   if (!ready || submit.disabled || !form.reportValidity()) return;
-  const data = new FormData(form);
+
+  const values = Object.fromEntries(new FormData(form));
   const originalLabel = submit.textContent;
-  submit.disabled = true;
-  submit.textContent = 'Please wait…';
+  setBusy(submit, true, originalLabel);
   form.setAttribute('aria-busy', 'true');
   status.hidden = true;
+
   try {
     if (page === 'signin') {
-      await identity.login(data.get('email').trim(), data.get('password'));
+      const { user } = await api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: values.email.trim(),
+          password: values.password,
+        }),
+      });
       form.reset();
-      showAccount('You’re signed in. Welcome back to Amadee-Stiches.');
+      showAccount(`You’re signed in${user?.name ? ` as ${user.name}` : ''}. Welcome back to Amadee-Stiches.`);
     } else if (page === 'signup') {
-      const user = await identity.signup(data.get('email').trim(), data.get('password'), { full_name: data.get('name').trim() });
-      form.reset();
-      if (user.confirmedAt) showAccount('Your account is ready. Welcome to Amadee-Stiches.');
-      else {
-        form.hidden = true;
-        message('Check your inbox for a confirmation link to finish creating your account. Check your spam folder too.');
+      if (!strongPassword(values.password)) {
+        throw new Error('Use at least 10 characters, including an uppercase letter, a lowercase letter, and a number.');
       }
+      const result = await api('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: values.name.trim(),
+          email: values.email.trim(),
+          password: values.password,
+        }),
+      });
+      showVerification(
+        result.email || values.email.trim(),
+        result.message || 'Check your email for the six-digit verification code.'
+      );
     } else if (page === 'forgot-password') {
-      await identity.requestPasswordRecovery(data.get('email').trim());
+      const result = await api('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: values.email.trim() }),
+      });
       form.reset();
-      message('If an account exists for that email, a reset link is on its way. Check your inbox and spam folder.');
+      const resetLink = document.getElementById('reset-link');
+      resetLink.href = `/reset-password.html?email=${encodeURIComponent(values.email.trim())}`;
+      resetLink.hidden = false;
+      message(result.message || 'If the account exists, password reset instructions will be sent.');
     } else if (page === 'reset-password') {
-      if (inviteToken) await identity.acceptInvite(inviteToken, data.get('password'));
-      else {
-        if (!await identity.getUser()) throw new Error('Your reset session has expired. Request a new reset link.');
-        await identity.updateUser({ password: data.get('password') });
+      if (!strongPassword(values.password)) {
+        throw new Error('Use at least 10 characters, including an uppercase letter, a lowercase letter, and a number.');
       }
-      inviteToken = null;
+      const result = await api('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: values.email.trim(),
+          otp: values.otp.trim(),
+          password: values.password,
+        }),
+      });
       form.reset();
-      showAccount('Your password has been saved. You can continue shopping.');
-      document.getElementById('reset-help').hidden = true;
+      message(result.message || 'Password updated. Please sign in again.');
+      document.getElementById('reset-help').hidden = false;
     }
   } catch (error) {
-    showError(error);
+    message(error.message || 'Something went wrong. Please try again.', true);
   } finally {
-    submit.disabled = false;
-    submit.textContent = originalLabel;
+    setBusy(submit, false, originalLabel);
     form.removeAttribute('aria-busy');
   }
 });
 
-document.getElementById('sign-out').addEventListener('click', async (event) => {
-  event.target.disabled = true;
+if (verificationPanel) {
+  verificationPanel.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = event.submitter;
+    if (!button || button.disabled) return;
+    const values = Object.fromEntries(new FormData(verificationPanel));
+    if (button.name === 'resend') {
+      setBusy(button, true);
+      try {
+        const result = await api('/auth/resend-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: values.email.trim() }),
+        });
+        message(result.message || 'If the account requires verification, a new code has been sent.');
+      } catch (error) {
+        message(error.message, true);
+      } finally {
+        setBusy(button, false);
+      }
+      return;
+    }
+
+    if (!verificationPanel.reportValidity()) return;
+    setBusy(button, true);
+    try {
+      const result = await api('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: values.email.trim(),
+          otp: values.otp.trim(),
+        }),
+      });
+      verificationPanel.hidden = true;
+      message(result.message || 'Email verified. You can now sign in.');
+      window.setTimeout(() => window.location.assign('./signin.html'), 1200);
+    } catch (error) {
+      message(error.message || 'The verification code could not be confirmed.', true);
+    } finally {
+      setBusy(button, false);
+    }
+  });
+}
+
+document.getElementById('sign-out')?.addEventListener('click', async event => {
+  const button = event.currentTarget;
+  setBusy(button, true);
   try {
-    await identity.logout();
-    window.location.assign('/signin.html');
+    await api('/auth/logout', { method: 'POST' });
+    window.location.assign('./signin.html');
   } catch (error) {
-    showError(error);
-    event.target.disabled = false;
+    message(error.message, true);
+    setBusy(button, false);
   }
 });
 
 async function init() {
-  // Move recovery links before consuming them, including links sent to the site root.
-  if (page !== 'reset-password' && /^#(?:recovery_token|invite_token)=/.test(location.hash)) {
-    location.replace('/reset-password.html' + location.hash);
-    return;
+  if (page === 'reset-password') {
+    const email = new URLSearchParams(window.location.search).get('email');
+    if (email) form.elements.email.value = email;
   }
+
   try {
-    identity = await loadIdentity();
-    const callback = await identity.handleAuthCallback();
-    if (callback?.type === 'invite') inviteToken = callback.token;
-    const user = await identity.getUser();
-    if (page === 'reset-password') {
-      if (!inviteToken && !user) {
-        form.hidden = true;
-        document.getElementById('reset-help').hidden = false;
-        message('Open the reset link in your email to choose a new password. If it has expired, request a new link.', true);
-        return;
-      }
-    } else if (user && page !== 'forgot-password') {
-      showAccount(callback?.type === 'confirmation' ? 'Your email is confirmed. You’re signed in.' : 'You’re already signed in. Welcome back.');
+    const { user } = await api('/auth/me');
+    if ((page === 'signin' || page === 'signup') && user) {
+      showAccount('You’re already signed in. Welcome back.');
     }
-    ready = true;
-    submit.disabled = false;
   } catch (error) {
-    showError(error);
-    if (page === 'reset-password') {
-      form.hidden = true;
-      document.getElementById('reset-help').hidden = false;
-    } else if (identity) {
-      // An expired confirmation link must not prevent a fresh sign-in attempt.
-      ready = true;
-      submit.disabled = false;
-    } else {
-      message('Account services couldn’t load. Check your connection and reload this page.', true);
+    if (error.status !== 401) {
+      message(`We could not check your existing session: ${error.message}`, true);
     }
   }
+
+  ready = true;
+  if (!form.hidden) submit.disabled = false;
 }
 
 init();

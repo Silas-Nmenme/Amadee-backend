@@ -1,14 +1,15 @@
-import { loadIdentity, routeAuthCallback } from './identity.js';
+import { api } from './utils.js';
 
 export async function initAuth() {
-  if (routeAuthCallback()) return;
   const button = document.getElementById('open-auth');
-  button.href = '/signin.html';
+  if (!button) return;
+
+  button.href = './signin.html';
   try {
-    const { getUser } = await loadIdentity();
-    const user = await getUser();
-    if (user) { button.textContent = 'My account'; button.href = '/account.html'; }
+    const { user } = await api('/auth/me');
+    button.textContent = user.role === 'admin' ? 'Admin account' : 'My account';
+    button.href = './account.html';
   } catch {
-    // The account link remains usable if the authentication service is unavailable.
+    // Keep the sign-in link available when no valid backend session exists.
   }
 }

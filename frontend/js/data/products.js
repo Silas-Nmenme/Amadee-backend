@@ -1,4 +1,4 @@
-export const products = [
+export let products = [
   {
     "id": "AS-001",
     "name": "Children's Occasion Set",
@@ -300,3 +300,61 @@ export const products = [
     "inStock": true
   }
 ];
+
+for (const product of products) {
+  product.images = product.images.map(image => image.replace(/^\/public\//, '/'));
+}
+
+function categoryKey(category) {
+  const normalized = String(category || '').trim().toLowerCase();
+  return ({
+    'children wears': 'children',
+    'children wear': 'children',
+    'office wears': 'office',
+    'office wear': 'office',
+    'casual wears': 'casual',
+    'casual wear': 'casual',
+  })[normalized] || normalized.replace(/\s+/g, '-');
+}
+
+export function setProductsFromApi(records) {
+  const fallbackProducts = products;
+  const mappedProducts = records.map(record => {
+    const fallback = fallbackProducts.find(product => product.id === record.productCode);
+    const images = Array.isArray(record.images)
+      ? record.images.filter(image => typeof image === 'string' && image.trim())
+      : [];
+    return {
+      id: record.productCode,
+      name: record.name,
+      category: categoryKey(record.category),
+      price: Number(record.price),
+      images: images.length
+        ? images.map(image => image.replace(/^\/public\//, '/'))
+        : fallback?.images || ['/assets/images/products/garment-placeholder.svg'],
+      sizes: Array.isArray(record.sizes) && record.sizes.length
+        ? record.sizes
+        : fallback?.sizes || ['One size'],
+      colours: Array.isArray(record.colours) && record.colours.length
+        ? record.colours
+        : fallback?.colours || ['Customer choice'],
+      description: record.description || fallback?.description || '',
+      inStock: record.active !== false && Number(record.stock) > 0,
+      backendAvailable: true,
+    };
+  }).filter(product =>
+    product.id &&
+    product.name &&
+    Number.isFinite(product.price) &&
+    product.images.length
+  );
+  if (!mappedProducts.length) return false;
+  const mappedIds = new Set(mappedProducts.map(product => product.id));
+  products = [
+    ...mappedProducts,
+    ...fallbackProducts
+      .filter(product => !mappedIds.has(product.id))
+      .map(product => ({ ...product, backendAvailable: false })),
+  ];
+  return true;
+}

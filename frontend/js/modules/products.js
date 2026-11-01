@@ -1,7 +1,7 @@
 // Product grid rendering: category filter, sort, live text search,
 // wishlist toggle and the size/colour quick-add picker.
-import { products } from "../data/products.js";
-import { byId, formatNaira, safeText } from "./utils.js";
+import { products, setProductsFromApi } from "../data/products.js";
+import { api, byId, formatNaira, safeText } from "./utils.js";
 import { addToCart } from "./cart.js";
 import { openModal, closeModal } from "./modal.js";
 import { toast } from "./toast.js";
@@ -10,6 +10,33 @@ import { getWishlist, initWishlist, toggleWishlist } from "./wishlist.js";
 
 let visibleLimit = 8;
 let searchQuery = "";
+let apiCatalogueLoaded = false;
+let catalogueStatus = "";
+let catalogueRequest;
+
+export const isApiCatalogueLoaded = () => apiCatalogueLoaded;
+
+export function loadProductsCatalogue() {
+  if (!catalogueRequest) {
+    catalogueRequest = api('/products?limit=50')
+      .then(({ products: records }) => {
+        if (!Array.isArray(records) || !records.length) {
+          catalogueStatus = "The live catalogue is empty. Showing the collection preview; order requests can be sent on WhatsApp.";
+          return false;
+        }
+        apiCatalogueLoaded = setProductsFromApi(records);
+        catalogueStatus = apiCatalogueLoaded
+          ? ""
+          : "The live catalogue could not be displayed. Showing the collection preview; order requests can be sent on WhatsApp.";
+        return apiCatalogueLoaded;
+      })
+      .catch(error => {
+        catalogueStatus = `The live catalogue is unavailable (${error.message}). Showing the collection preview; order requests can be sent on WhatsApp.`;
+        return false;
+      });
+  }
+  return catalogueRequest;
+}
 
 // Called by search.js whenever the search box changes. Keeping the query
 // here (rather than scrolling or touching the category dropdown) means
@@ -40,7 +67,11 @@ export function renderProducts() {
   const sort = byId("sort-filter").value;
 
   let list = products.filter(
-    (p) => (category === "all" || p.category === category) && p.inStock && matchesSearch(p)
+    (p) =>
+      (!apiCatalogueLoaded || p.backendAvailable) &&
+      (category === "all" || p.category === category) &&
+      p.inStock &&
+      matchesSearch(p)
   );
   if (sort === "price-asc") list.sort((a, b) => a.price - b.price);
   if (sort === "price-desc") list.sort((a, b) => b.price - a.price);
@@ -61,6 +92,7 @@ export function renderProducts() {
   resultCount.textContent = searchQuery
     ? `${list.length} result${list.length === 1 ? "" : "s"} for “${searchQuery}”`
     : "";
+  byId("catalogue-status").textContent = catalogueStatus;
 
   const loadMore = byId("load-more");
   loadMore.classList.toggle("hidden", shown.length >= list.length);
@@ -77,7 +109,7 @@ export function makeCard(p) {
   img.width = 800;
   img.height = 1000; // 4:5, matches the CSS aspect-ratio
   img.loading = "lazy";
-  img.onerror = () => { img.onerror = null; img.src = "/public/assets/images/products/garment-placeholder.svg"; };
+  img.onerror = () => { img.onerror = null; img.src = "/assets/images/products/garment-placeholder.svg"; };
 
   const content = document.createElement("div");
   content.className = "product-card-content";
@@ -256,5 +288,5 @@ export function initProducts() {
     renderProducts();
   });
   renderProducts();
+  loadProductsCatalogue().then(renderProducts);
 }
-

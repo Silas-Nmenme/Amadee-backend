@@ -2,9 +2,12 @@
 
 ## Frontend/API integration
 
-The static storefront in `frontend/` uses `https://amadee-backend.vercel.app/api`
-by default. Set `window.AMADEE_API_URL` before loading the frontend modules to
-override the backend origin or API base URL.
+The static storefront in `frontend/` sends production API requests to the
+same-origin `/api` path. `netlify.toml` proxies those requests to
+`https://amadee-backend.vercel.app/api`, allowing the backend's HttpOnly session
+cookie to work from the Netlify site. Local development defaults to
+`http://localhost:3000/api`. Set `window.AMADEE_API_URL` before loading the
+frontend modules to override either API base URL.
 
 The API always permits the production storefront origin,
 `https://amadeestiches.netlify.app`. Configure additional exact origins with
@@ -14,7 +17,8 @@ production. Do not configure wildcard origins when credentials are enabled.
 Set `OTP_SECRET` to a random secret of at least 32 characters for keyed OTP
 hashing; `JWT_SECRET` is used as a fallback when `OTP_SECRET` is not set.
 
-The cart and wishlist are stored in the visitor's browser because the backend
-does not expose cart or wishlist endpoints. Account sign-in currently uses
-Netlify Identity; the backend's separate OTP/JWT authentication routes are not
-used by the storefront.
+The storefront uses the backend's email/OTP/JWT authentication, product,
+order, review, contact, and newsletter endpoints. Cart and wishlist selections
+remain in browser storage because the backend does not expose those endpoints.
+The bundled product list remains available when the backend catalogue is empty;
+online order submission is enabled for products returned by the backend.

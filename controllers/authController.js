@@ -396,6 +396,33 @@ export async function getMe(req, res) {
   });
 }
 
+export async function updateMe(req, res, next) {
+  try {
+    const schema = z.object({
+      name: z.string().trim().min(2).max(80),
+    }).strict();
+    const parsed = schema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Please provide a valid full name.",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    req.user.name = parsed.data.name;
+    await req.user.save();
+
+    return res.status(200).json({
+      success: true,
+      user: publicUser(req.user),
+      message: "Profile updated successfully.",
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 /* =========================================================
    LOGOUT
    POST /api/auth/logout

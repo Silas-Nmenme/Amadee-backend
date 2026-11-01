@@ -6,6 +6,7 @@ import {
   resendOtp,
   login,
   getMe,
+  updateMe,
   logout,
   forgotPassword,
   resetPassword,
@@ -44,6 +45,7 @@ router.post("/reset-password", authLimiter, resetPassword);
 
 // Get logged-in user
 router.get("/me", requireAuth, getMe);
+router.patch("/me", requireAuth, updateMe);
 
 // Logout
 router.post("/logout", requireAuth, logout);

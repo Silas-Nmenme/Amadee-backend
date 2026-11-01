@@ -7,11 +7,24 @@ let cart = [];
 let queue = Promise.resolve();
 let loaded = false;
 
+function productFromSnapshot(snapshot) {
+  if (
+    !snapshot ||
+    typeof snapshot.name !== 'string' ||
+    !Number.isFinite(snapshot.price) ||
+    !Array.isArray(snapshot.images) ||
+    !Array.isArray(snapshot.sizes) ||
+    !Array.isArray(snapshot.colours)
+  ) return null;
+  return { ...snapshot, backendAvailable: false, inStock: true };
+}
+
 function readCart() {
   const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
   if (!Array.isArray(saved)) throw new Error('Your saved cart is invalid. Please clear it and try again.');
   return saved.filter(item => {
-    const product = products.find(candidate => candidate.id === item?.id);
+    const product = products.find(candidate => candidate.id === item?.id) ||
+      productFromSnapshot(item?.snapshot);
     return product?.inStock &&
       product.sizes.includes(item.size) &&
       product.colours.includes(item.colour) &&
@@ -45,7 +58,11 @@ function mutate(change) {
   });
   return queue.catch(err => { toast(err.message, 'error'); throw err; });
 }
-export const getCart = () => cart.map(x => ({ ...x, product: products.find(p => p.id === x.id) }));
+export const getCart = () => cart.map(item => ({
+  ...item,
+  product: products.find(product => product.id === item.id) ||
+    productFromSnapshot(item.snapshot),
+}));
 export const getSubtotal = () => getCart().reduce((sum, x) => sum + x.product.price * x.quantity, 0);
 export async function addToCart(id, quantity = 1, options = {}) {
   const p = products.find(x => x.id === id);
@@ -54,8 +71,18 @@ export async function addToCart(id, quantity = 1, options = {}) {
     await mutate(next => {
       const size = options.size || p.sizes[0], colour = options.colour || p.colours[0];
       const existing = next.find(x => x.id === id && x.size === size && x.colour === colour);
-      if (existing) existing.quantity = Math.min(20, existing.quantity + quantity);
-      else next.push({ id, size, colour, quantity });
+      const snapshot = {
+        name: p.name,
+        price: p.price,
+        images: p.images,
+        sizes: p.sizes,
+        colours: p.colours,
+        description: p.description,
+      };
+      if (existing) {
+        existing.quantity = Math.min(20, existing.quantity + quantity);
+        existing.snapshot = snapshot;
+      } else next.push({ id, size, colour, quantity, snapshot });
     });
     toast('Added to your cart.');
   } catch { /* Error is displayed by mutate. */ }
