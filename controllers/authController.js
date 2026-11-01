@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -131,7 +131,7 @@ function clearSession(res) {
    POST /api/auth/signup
 ========================================================= */
 
-export async function signup(req, res, next) {
+async function registerAccount(req, res, next, role) {
   try {
     const parsed = signupSchema.safeParse(req.body);
 
@@ -145,6 +145,27 @@ export async function signup(req, res, next) {
     const { name, password } = parsed.data;
     const email = normalizeEmail(parsed.data.email);
 
+    if (role === "admin") {
+      const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || "");
+      if (!adminEmail) {
+        return res.status(503).json({
+          message: "Admin registration is not configured.",
+        });
+      }
+
+      if (email !== adminEmail) {
+        return res.status(403).json({
+          message: "This email address is not authorized for admin registration.",
+        });
+      }
+
+      if (await User.exists({ role: "admin" })) {
+        return res.status(409).json({
+          message: "An administrator account has already been registered.",
+        });
+      }
+    }
+
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -153,18 +174,11 @@ export async function signup(req, res, next) {
       });
     }
 
-    const adminEmail = normalizeEmail(
-      process.env.ADMIN_EMAIL || ""
-    );
-
     const user = await User.create({
       name,
       email,
       passwordHash: await bcrypt.hash(password, 12),
-      role:
-        adminEmail && email === adminEmail
-          ? "admin"
-          : "customer",
+      role,
       verified: false,
     });
 
@@ -203,6 +217,35 @@ export async function signup(req, res, next) {
 
     next(error);
   }
+}
+
+export function signup(req, res, next) {
+  return registerAccount(req, res, next, "customer");
+}
+
+export function registerAdmin(req, res, next) {
+  const configuredKey = process.env.ADMIN_REGISTRATION_KEY;
+  const suppliedKey = req.get("x-admin-registration-key");
+
+  if (!configuredKey || configuredKey.length < 32) {
+    return res.status(503).json({
+      message: "Admin registration is not configured.",
+    });
+  }
+
+  if (
+    typeof suppliedKey !== "string" ||
+    !timingSafeEqual(
+      createHash("sha256").update(suppliedKey).digest(),
+      createHash("sha256").update(configuredKey).digest()
+    )
+  ) {
+    return res.status(403).json({
+      message: "Admin registration is not authorized.",
+    });
+  }
+
+  return registerAccount(req, res, next, "admin");
 }
 
 /* =========================================================

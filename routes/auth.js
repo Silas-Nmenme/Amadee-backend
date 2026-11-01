@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   signup,
+  registerAdmin,
   verifyOtp,
   resendOtp,
   login,
@@ -23,6 +24,9 @@ const router = Router();
 
 // Register account
 router.post("/signup", authLimiter, signup);
+
+// Bootstrap the single configured administrator using a server-side secret.
+router.post("/register-admin", authLimiter, registerAdmin);
 
 // Verify email
 router.post("/verify-otp", authLimiter, verifyOtp);

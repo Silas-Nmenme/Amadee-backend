@@ -28,5 +28,12 @@ Signed-in customers can manage their profile and view order history at
 with that customer. Administrators can manage orders, inventory, catalogue
 products, subscribers, and summary metrics at `frontend/admin.html`; the
 backend enforces administrator authorization on each management endpoint.
-Set `ADMIN_EMAIL` to the verified administrator email address before creating
-that account; public registration cannot assign the admin role to other users.
+To bootstrap the single administrator, configure `ADMIN_EMAIL` and a random
+`ADMIN_REGISTRATION_KEY` of at least 32 characters on the backend, then make a
+server-side `POST /api/auth/register-admin` request with that email, name, and a
+strong password in the JSON body and the key in the
+`x-admin-registration-key` header. The new administrator must complete the
+emailed OTP verification before signing in. The bootstrap key is never sent
+from the browser, and ordinary `/api/auth/signup` registrations cannot create
+admin accounts. Once an admin exists, the endpoint refuses further admin
+registrations.
