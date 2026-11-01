@@ -1,4 +1,4 @@
-import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -149,7 +149,8 @@ async function registerAccount(req, res, next, role) {
       const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || "");
       if (!adminEmail) {
         return res.status(503).json({
-          message: "Admin registration is not configured.",
+          message:
+            "Admin registration is not configured. Set ADMIN_EMAIL in the backend environment and restart or redeploy the API.",
         });
       }
 
@@ -224,27 +225,6 @@ export function signup(req, res, next) {
 }
 
 export function registerAdmin(req, res, next) {
-  const configuredKey = process.env.ADMIN_REGISTRATION_KEY;
-  const suppliedKey = req.get("x-admin-registration-key");
-
-  if (!configuredKey || configuredKey.length < 32) {
-    return res.status(503).json({
-      message: "Admin registration is not configured.",
-    });
-  }
-
-  if (
-    typeof suppliedKey !== "string" ||
-    !timingSafeEqual(
-      createHash("sha256").update(suppliedKey).digest(),
-      createHash("sha256").update(configuredKey).digest()
-    )
-  ) {
-    return res.status(403).json({
-      message: "Admin registration is not authorized.",
-    });
-  }
-
   return registerAccount(req, res, next, "admin");
 }
 

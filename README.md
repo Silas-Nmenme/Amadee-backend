@@ -28,12 +28,16 @@ Signed-in customers can manage their profile and view order history at
 with that customer. Administrators can manage orders, inventory, catalogue
 products, subscribers, and summary metrics at `frontend/admin.html`; the
 backend enforces administrator authorization on each management endpoint.
-To bootstrap the single administrator, configure `ADMIN_EMAIL` and a random
-`ADMIN_REGISTRATION_KEY` of at least 32 characters on the backend, then make a
-server-side `POST /api/auth/register-admin` request with that email, name, and a
-strong password in the JSON body and the key in the
-`x-admin-registration-key` header. The new administrator must complete the
-emailed OTP verification before signing in. The bootstrap key is never sent
-from the browser, and ordinary `/api/auth/signup` registrations cannot create
-admin accounts. Once an admin exists, the endpoint refuses further admin
-registrations.
+To bootstrap the single administrator, configure `ADMIN_EMAIL` on the backend,
+then send `POST /api/auth/register-admin` with the same JSON body as normal
+signup: `{ "name", "email", "password" }`. The email must match `ADMIN_EMAIL`,
+and the new administrator must complete the emailed OTP verification before
+signing in. No extra registration-key header is needed. Ordinary
+`/api/auth/signup` registrations cannot create admin accounts, and once an
+admin exists the endpoint refuses further admin registrations.
+
+For local development, set `ADMIN_EMAIL` in `.env` and restart the API. For
+Vercel, add `ADMIN_EMAIL` to the project's Environment Variables for the
+deployment environment being tested, then redeploy so the function receives
+the updated setting. Keep the configured address private and do not accept an
+admin email from the request as an authorization override.
