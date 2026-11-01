@@ -188,6 +188,19 @@ async function checkout() {
     const submit = safeText('button', 'Place order', 'button');
     submit.type = 'submit';
     form.append(submit);
+    api('/auth/me')
+      .then(({ user }) => {
+        const name = form.elements.namedItem('name');
+        const email = form.elements.namedItem('email');
+        if (name && !name.value) name.value = user.name || '';
+        if (email && !email.value) email.value = user.email || '';
+        if (email && user.email) email.readOnly = true;
+      })
+      .catch(error => {
+        if (error.status !== 401) {
+          status.textContent = `Your profile could not be prefilled: ${error.message}. You can still enter your details.`;
+        }
+      });
     form.onsubmit = async event => {
       event.preventDefault();
       if (!form.reportValidity() || submit.disabled) return;

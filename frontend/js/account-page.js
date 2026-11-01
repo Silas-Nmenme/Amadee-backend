@@ -122,6 +122,7 @@ async function start() {
     message('Welcome back. Make yourself at home.');
     await loadOrders();
     if (user.role === 'admin') {
+      document.getElementById('admin-dashboard-link').hidden = false;
       document.getElementById('moderation').hidden = false;
       loadReviews();
     }

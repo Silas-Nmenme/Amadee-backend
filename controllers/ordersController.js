@@ -275,12 +275,16 @@ export async function createOrder(req, res, next) {
       .toUpperCase()}-${randomUUID().slice(0, 6).toUpperCase()}`;
 
     const measurements = normalizeMeasurements(body.measurements);
+    const customer = req.user
+      ? { ...body.customer, email: req.user.email }
+      : body.customer;
 
     // Save the order before initializing Paystack so the transaction
     // reference can be associated with a persistent order.
     const order = await Order.create({
       orderId,
-      customer: body.customer,
+      ...(req.user ? { user: req.user._id } : {}),
+      customer,
       items,
       deliveryOption: body.deliveryOption,
       measurements,
@@ -421,7 +425,10 @@ export async function getMyOrders(req, res, next) {
     }
 
     const orders = await Order.find({
-      "customer.email": email,
+      $or: [
+        { user: req.user._id },
+        { "customer.email": email },
+      ],
     })
       .select(
         "orderId items subtotal discount deliveryFee total paymentMethod paymentStatus paymentReference orderStatus createdAt"

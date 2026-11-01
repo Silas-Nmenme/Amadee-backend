@@ -15,10 +15,18 @@ function message(text, error = false) {
   status.focus();
 }
 
-function showAccount(text) {
+function showAccount(text, user) {
   message(text);
   form.hidden = true;
   actions.hidden = false;
+  const destination = document.getElementById('account-destination');
+  if (destination && user?.role === 'admin') {
+    destination.href = './admin.html';
+    destination.textContent = 'Open admin dashboard';
+  } else if (destination) {
+    destination.href = './account.html';
+    destination.textContent = 'Open my account';
+  }
 }
 
 function showVerification(email, text) {
@@ -92,7 +100,7 @@ form.addEventListener('submit', async event => {
         }),
       });
       form.reset();
-      showAccount(`You’re signed in${user?.name ? ` as ${user.name}` : ''}. Welcome back to Amadee-Stiches.`);
+      showAccount(`You’re signed in${user?.name ? ` as ${user.name}` : ''}. Welcome back to Amadee-Stiches.`, user);
     } else if (page === 'signup') {
       if (!strongPassword(values.password)) {
         throw new Error('Use at least 10 characters, including an uppercase letter, a lowercase letter, and a number.');
@@ -207,7 +215,7 @@ async function init() {
   try {
     const { user } = await api('/auth/me');
     if ((page === 'signin' || page === 'signup') && user) {
-      showAccount('You’re already signed in. Welcome back.');
+      showAccount('You’re already signed in. Welcome back.', user);
     }
   } catch (error) {
     if (error.status !== 401) {

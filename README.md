@@ -22,3 +22,11 @@ order, review, contact, and newsletter endpoints. Cart and wishlist selections
 remain in browser storage because the backend does not expose those endpoints.
 The bundled product list remains available when the backend catalogue is empty;
 online order submission is enabled for products returned by the backend.
+
+Signed-in customers can manage their profile and view order history at
+`frontend/account.html`. Orders submitted with a valid session are associated
+with that customer. Administrators can manage orders, inventory, catalogue
+products, subscribers, and summary metrics at `frontend/admin.html`; the
+backend enforces administrator authorization on each management endpoint.
+Set `ADMIN_EMAIL` to the verified administrator email address before creating
+that account; public registration cannot assign the admin role to other users.
