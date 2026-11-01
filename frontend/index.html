@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en-NG">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Amadee-Stiches creates children wears, office wears, Ankara and casual outfits made with care in Nigeria.">
+  <meta property="og:title" content="Amadee-Stiches | Tailored for You">
+  <meta property="og:description" content="Discover handcrafted Nigerian fashion and made-to-measure tailoring.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#1e9eb4">
+  <title>Amadee-Stiches | Tailored for You</title>
+  <link rel="icon" href="/assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/variables.css">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/layout.css">
+  <link rel="stylesheet" href="./css/components.css">
+  <link rel="stylesheet" href="/css/pages.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"ClothingStore","name":"Amadee-Stiches","description":"Nigerian tailoring and fashion brand","priceRange":"₦₦","currenciesAccepted":"NGN"}
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#home" aria-label="Amadee-Stiches home">
+        <img src="./assets/images/logo.svg" width="48" height="48" alt="Amadee-Stiches logo">
+        <span>Amadee-Stiches</span>
+      </a>
+      <button class="icon-button menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Open navigation">☰</button>
+      <nav id="primary-nav" class="nav-links" aria-label="Main navigation">
+        <a href="#home">Home</a><a href="#about">About</a><a href="#products">Products</a>
+        <a href="/wishlist.html">Wishlist</a><a href="/help.html">Help</a><a href="#testimonials">Reviews</a><a href="#contact">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <label class="sr-only" for="search-input">Search products</label>
+        <div class="search-field">
+          <input id="search-input" type="search" placeholder="Search styles…" autocomplete="off">
+          <button type="button" id="search-clear" class="search-clear hidden" aria-label="Clear search">×</button>
+        </div>
+        <a class="button button-small" href="/cart.html" aria-label="Open shopping cart">Cart <span id="cart-count" aria-live="polite">0</span></a>
+        <a class="button button-small" id="open-auth" href="./signin.html">Sign in</a>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <section class="hero" id="home">
+      <div class="hero-content">
+        <p class="eyebrow">Made with care. Tailored for you.</p>
+        <h1>Wear your story with Amadee-Stiches</h1>
+        <p>Thoughtful Nigerian fashion for little ones, the workplace, celebrations and everyday life.</p>
+        <a class="button" href="#products">Explore the collection</a>
+      </div>
+    </section>
+    <section id="about" class="section section-narrow">
+      <p class="eyebrow">Our craft</p><h2>Fashion with a personal touch</h2>
+      <p>From children’s outfits to office essentials, Ankara statements and casual pieces, we make clothing with attention to fit, finish and the details that make it yours. Ask for made-to-measure options at checkout.</p>
+    </section>
+    <section id="products" class="section">
+      <div class="section-heading"><div><p class="eyebrow">The collection</p><h2>Our Products</h2></div>
+        <p>Browse the collection and find your next favourite look.</p></div>
+      <div class="filters">
+        <label>Category <select id="category-filter"><option value="all">All categories</option><option value="children">Children Wears</option><option value="office">Office Wears</option><option value="ankara">Ankara</option><option value="casual">Casual Wears</option></select></label>
+        <label>Sort <select id="sort-filter"><option value="default">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name">Name A–Z</option></select></label>
+      </div>
+      <p id="product-result-count" class="result-count" aria-live="polite"></p>
+      <div id="product-grid" class="product-grid" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <button id="load-more" class="button button-outline hidden">View more</button>
+    </section>
+    <section id="testimonials" class="section section-soft">
+      <p class="eyebrow">Customer voices</p><h2>Reviews from our customers</h2>
+      <div id="reviews-list" class="reviews-list"><p>No approved reviews yet. Be the first to share your experience.</p></div>
+      <button id="view-more-reviews" class="button button-outline hidden">View more reviews</button>
+      <form id="review-form" class="form-card">
+        <h3>Leave a review</h3><p class="form-status" role="status" aria-live="polite"></p><label class="honeypot" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label for="review-name">Your name</label><input id="review-name" name="name" maxlength="80" required>
+        <label for="review-rating">Rating</label><select id="review-rating" name="rating" required><option value="">Choose a rating</option><option value="5">5 — Excellent</option><option value="4">4 — Very good</option><option value="3">3 — Good</option><option value="2">2 — Fair</option><option value="1">1 — Poor</option></select>
+        <label for="review-message">Your review</label><textarea id="review-message" name="message" rows="4" maxlength="1500" required></textarea>
+        <button class="button" type="submit">Submit for approval</button>
+      </form>
+    </section>
+    <section id="contact" class="section section-narrow">
+      <p class="eyebrow">We’re here to help</p><h2>Contact Amadee-Stiches</h2>
+      <form name="contact" id="contact-form" class="form-card">
+        <p class="form-status" role="status" aria-live="polite"></p>
+        <label for="contact-name">Name</label><input id="contact-name" name="name" required maxlength="80">
+        <label for="contact-email">Email</label><input id="contact-email" name="email" type="email" required maxlength="254">
+        <label for="contact-message">Message</label><textarea id="contact-message" name="message" rows="5" required maxlength="3000"></textarea>
+        <label class="honeypot" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+        <button class="button" type="submit">Send message</button>
+      </form>
+      <form name="newsletter" id="newsletter-form" class="newsletter-form">
+        <p class="form-status" role="status" aria-live="polite"></p>
+        <label for="newsletter-email">Get collection updates</label><div class="inline-form"><input id="newsletter-email" name="email" type="email" placeholder="Your email address" required><button class="button" type="submit">Subscribe</button></div>
+        <label class="honeypot" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
+      </form>
+    </section>
+  </main>
+  <footer class="site-footer"><p>© <span id="year"></span> Amadee-Stiches. All rights reserved.</p><div><a href="/size-guide.html">Size guide</a><a href="/help.html">Delivery &amp; returns</a><a href="./privacy.html">Privacy Policy</a><a href="./terms.html">Terms</a><a href="https://wa.me/2349034063970" target="_blank" rel="noopener noreferrer">WhatsApp</a></div></footer>
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+  <div id="modal-root"></div>
+</body>
+</html>

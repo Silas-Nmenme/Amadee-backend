@@ -12,9 +12,7 @@ router.get("/", (_req, res) => {
     deliveryFees,
     whatsapp: process.env.SHOP_WHATSAPP_NUMBER || "2349034063970",
     payments: {
-      // Paystack stays off until routes/payments.js is actually implemented
-      // (it currently returns 501 for both initialize and the webhook).
-      paystack: false,
+      paystack: Boolean(process.env.PAYSTACK_SECRET_KEY),
       bankTransfer: true,
       payOnDelivery: true,
     },

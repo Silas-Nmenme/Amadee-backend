@@ -1,0 +1,38 @@
+/* =========================================================
+   Amadee-Stiches design system
+   Brand: teal + fresh green + warm gold, softened with ivory
+   ========================================================= */
+:root {
+  color-scheme: light;
+  --teal: #168da0;
+  --teal-dark: #0e5965;
+  --teal-deep: #092f35;
+  --teal-pale: #e7f5f5;
+  --green: #176b43;
+  --green-button: #21864c;
+  --green-hover: #176a3a;
+  --gold: #f3c84b;
+  --gold-deep: #9a6d05;
+  --ink: #1c292a;
+  --muted: #647476;
+  --paper: #fffdf8;
+  --surface: #ffffff;
+  --soft: #f4f7f3;
+  --soft-warm: #fbf4e6;
+  --border: #dce6e2;
+  --danger: #b42318;
+  --success: #176b43;
+  --space-1: .35rem;
+  --space-2: .65rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --radius-sm: 8px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --shadow-sm: 0 4px 14px rgba(17, 54, 54, .06);
+  --shadow: 0 14px 38px rgba(17, 54, 54, .10);
+  --shadow-hover: 0 22px 50px rgba(17, 54, 54, .16);
+  --content: 1180px;
+  --transition: 180ms ease;
+}

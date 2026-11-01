@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en-NG"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>My account | Amadee-Stiches</title><meta name="description" content="My account for Amadee-Stiches, handcrafted Nigerian fashion."><link rel="icon" href="./assets/images/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./css/variables.css"><link rel="stylesheet" href="./css/base.css"><link rel="stylesheet" href="./css/layout.css"><link rel="stylesheet" href="./css/components.css"><link rel="stylesheet" href="./css/pages.css"><link rel="stylesheet" href="./css/responsive.css"><script type="module" src="./js/account-page.js"></script></head>
+<body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="./"><img src="./assets/images/logo.svg" width="44" height="44" alt=""><span>Amadee-Stiches</span></a><nav class="page-nav" aria-label="Main navigation"><a href="./#products">Shop</a><a href="./wishlist.html">Wishlist</a><a href="./help.html">Help</a><a href="./cart.html">Cart <span id="cart-count"></span></a><a id="open-auth" href="./signin.html">Sign in</a></nav></div></header>
+<main class="section support-page" id="main">
+  <div class="page-intro"><p class="eyebrow">Your personal corner</p><h1>Hello again.</h1><a href="./#products">Back to the collection ↗</a></div>
+  <p id="account-status" role="status">Loading your account…</p>
+  <a id="account-signin" class="button" href="./signin.html" hidden>Sign in</a>
+  <div id="account-panel" hidden>
+    <div class="support-layout">
+      <aside class="support-note">
+        <h2>Your collection, your way.</h2><p id="account-email"></p>
+        <div class="account-links"><a href="./wishlist.html">View saved styles ↗</a><a href="./cart.html">Open your cart ↗</a><a href="./forgot-password.html">Request a password reset ↗</a><a href="./help.html">Get help with an order ↗</a></div>
+        <p>Your cart and wishlist are saved on this browser, independently of your account.</p>
+        <button id="account-signout" class="button button-outline" type="button">Sign out</button>
+      </aside>
+      <form id="profile-form" class="help-block">
+        <h2>Your profile</h2><label for="full-name">Full name</label><input id="full-name" name="fullName" autocomplete="name" maxlength="80" required>
+        <button class="button" type="submit">Save profile</button>
+      </form>
+    </div>
+    <section id="moderation" class="help-block" hidden>
+      <p class="eyebrow">Administrator</p><h2>Review approval</h2><p>Publish genuine customer experiences. Rejected reviews are removed.</p>
+      <button id="refresh-reviews" class="button button-outline" type="button">Refresh pending reviews</button><div id="moderation-list" class="moderation-list"></div>
+    </section>
+  </div>
+  <noscript><p>Enable JavaScript to manage your account.</p></noscript>
+</main>
+<footer class="site-footer"><p>Amadee-Stiches · Made with care. Tailored for you.</p><div><a href="./size-guide.html">Size guide</a><a href="./help.html">Delivery &amp; returns</a><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a></div></footer><div id="toast-region" class="toast-region" role="status" aria-live="polite"></div><div id="modal-root"></div></body></html>

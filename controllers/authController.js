@@ -59,10 +59,13 @@ const resetPasswordSchema = z.object({
 const cookieName =
   process.env.JWT_COOKIE_NAME || "amadee_session";
 
+const cookieSameSite =
+  process.env.NODE_ENV === "production" ? "none" : "lax";
+
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: cookieSameSite,
   path: "/",
   maxAge: 24 * 60 * 60 * 1000,
 };
@@ -70,7 +73,7 @@ const cookieOptions = {
 const clearCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: cookieSameSite,
   path: "/",
 };
 

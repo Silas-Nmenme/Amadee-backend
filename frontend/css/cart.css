@@ -1,0 +1,42 @@
+[hidden] { display: none !important; }
+.cart-page { min-height: 70vh; padding-top: 2.5rem; }
+.cart-nav { margin-left: auto; display: flex; gap: 1.4rem; align-items: center; }
+.cart-nav a { color: white; text-decoration: none; font-size: .9rem; }
+.cart-nav [aria-current] { color: var(--gold); }
+.back-link { font-size: .9rem; text-decoration: none; }
+.cart-heading { display: flex; justify-content: space-between; align-items: end; gap: 2rem; padding: 2.7rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+.cart-heading h1 { font-size: clamp(2.5rem, 5vw, 4.3rem); margin: 0; }
+.cart-heading h1 span { color: var(--gold-deep); }
+.cart-heading > p { color: var(--muted); margin-bottom: .25rem; }
+.cart-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 3rem; align-items: start; }
+.cart-list-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.cart-list-heading h2 { font-size: 1.5rem; margin: 0; }
+.text-button { border: 0; background: transparent; color: var(--teal-dark); text-decoration: underline; padding: .5rem; }
+.cart-hint { color: var(--muted); font-size: .84rem; margin: .7rem 0 1rem; }
+.cart-item { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 1.3rem; padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+.cart-item img { width: 110px; height: 145px; object-fit: cover; background: var(--soft); border-radius: 8px; }
+.cart-item h3 { font-family: Georgia, serif; font-size: 1.25rem; margin: 0 0 .4rem; }
+.item-top, .item-bottom { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.item-top { align-items: start; }
+.item-top strong { white-space: nowrap; }
+.item-price { color: var(--muted); font-size: .85rem; margin-bottom: .6rem; }
+.item-options { display: flex; gap: .8rem; margin-bottom: .8rem; }
+.item-options label { margin: 0; flex: 1; max-width: 180px; font-size: .78rem; }
+.item-options select { padding: .35rem .5rem; min-height: 40px; }
+.cart-quantity { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.cart-quantity button { width: 40px; min-height: 40px; border: 0; background: var(--soft); color: var(--teal-deep); }
+.cart-quantity span { min-width: 36px; text-align: center; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.order-summary { padding: 1.8rem; border: 1px solid var(--border); border-top: 4px solid var(--teal-dark); background: var(--soft); border-radius: 4px 4px 16px 16px; position: sticky; top: 110px; }
+.order-summary h2 { font-size: 1.8rem; }
+.summary-line { display: flex; justify-content: space-between; gap: 1rem; margin: 1rem 0; font-size: .92rem; }
+.summary-line.total { border-top: 1px solid var(--border); padding-top: 1.2rem; font-size: 1.15rem; }
+.order-summary .button { width: 100%; }
+.summary-footnote { font-size: .76rem; text-align: center; color: var(--muted); margin: 1rem 0 0; }
+.craft-note { border-left: 3px solid var(--gold); padding-left: 1rem; color: var(--muted); margin-top: 1.6rem; font-size: .9rem; }
+.empty-cart { max-width: 540px; margin: 3rem auto; padding: 2rem 0; text-align: center; }
+.empty-cart h2 { font-size: 2.5rem; }
+.empty-cart > p:not(.eyebrow) { color: var(--muted); }
+.empty-mark { display: grid; place-items: center; margin: 0 auto 2rem; width: 80px; height: 80px; border: 1px solid var(--gold-deep); border-radius: 50%; font: italic 2rem Georgia, serif; color: var(--teal-dark); }
+@media(max-width: 900px) { .cart-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 1.5rem; } .item-top { display: block; } }
+@media(max-width: 700px) { .cart-layout { grid-template-columns: 1fr; } .order-summary { position: static; } .cart-heading > p { display: none; } .cart-nav { gap: .9rem; } .cart-nav a:first-child { display: none; } .header-inner { flex-wrap: wrap; } .brand { font-size: .95rem; } .cart-item { grid-template-columns: 85px minmax(0, 1fr); gap: .9rem; } .cart-item img { width: 85px; height: 120px; } .cart-page { padding: 2rem 1rem 3rem; } }

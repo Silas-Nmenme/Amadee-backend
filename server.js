@@ -23,18 +23,31 @@ import connectDB from "./config/db.js";
 const app = express();
 
 const port = Number(process.env.PORT) || 3000;
-const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
+const productionFrontendOrigin = "https://amadeestiches.netlify.app";
+const configuredFrontendOrigins = [
+  process.env.FRONTEND_ORIGINS,
+  process.env.FRONTEND_ORIGIN,
+]
+  .flatMap((value) => (value || "").split(","))
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+const allowedOrigins = new Set([
+  productionFrontendOrigin,
+  ...configuredFrontendOrigins,
+]);
 
-if (process.env.NODE_ENV === "production" && !allowedOrigin) {
-  throw new Error(
-    "FRONTEND_ORIGIN must be configured in production."
-  );
-}
+function isLocalDevelopmentOrigin(origin) {
+  if (process.env.NODE_ENV === "production") return false;
 
-if (!allowedOrigin) {
-  console.warn(
-    "FRONTEND_ORIGIN is not set. Configure it in your .env file."
-  );
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 app.disable("x-powered-by");
@@ -50,13 +63,15 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigin && origin === allowedOrigin) {
+      if (allowedOrigins.has(origin) || isLocalDevelopmentOrigin(origin)) {
         return callback(null, true);
       }
 
-      return callback(new Error("Origin not allowed by CORS"));
+      return callback(null, false);
     },
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -116,7 +131,7 @@ async function startServer() {
     app.listen(port, () => {
       console.log(`Amadee Stiches API running on port ${port}`);
       console.log(
-        `Frontend origin: ${allowedOrigin || "Not configured"}`
+        `Allowed frontend origins: ${[...allowedOrigins].join(", ")}`
       );
     });
   } catch (error) {
