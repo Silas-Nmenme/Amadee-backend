@@ -25,7 +25,7 @@ const router = Router();
 // Register account
 router.post("/signup", authLimiter, signup);
 
-// Bootstrap the single administrator allowlisted by ADMIN_EMAIL.
+// Bootstrap the first administrator using the backend-only setup key.
 router.post("/register-admin", authLimiter, registerAdmin);
 
 // Verify email

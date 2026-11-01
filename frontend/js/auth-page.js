@@ -4,7 +4,6 @@ const page = document.body.dataset.authPage;
 const form = document.getElementById('auth-form');
 const submit = form.querySelector('[type="submit"]');
 const status = document.getElementById('auth-status');
-const actions = document.getElementById('account-actions');
 const verificationPanel = document.getElementById('verification-panel');
 let ready = false;
 
@@ -15,18 +14,14 @@ function message(text, error = false) {
   status.focus();
 }
 
-function showAccount(text, user) {
-  message(text);
-  form.hidden = true;
-  actions.hidden = false;
-  const destination = document.getElementById('account-destination');
-  if (destination && user?.role === 'admin') {
-    destination.href = './admin.html';
-    destination.textContent = 'Open admin dashboard';
-  } else if (destination) {
-    destination.href = './account.html';
-    destination.textContent = 'Open my account';
-  }
+function dashboardForRole(role) {
+  if (role === 'admin') return './admin.html';
+  if (role === 'customer') return './account.html';
+  throw new Error('Your account role is not recognized. Please contact support.');
+}
+
+function redirectToDashboard(user) {
+  window.location.assign(dashboardForRole(user?.role));
 }
 
 function showVerification(email, text) {
@@ -100,7 +95,7 @@ form.addEventListener('submit', async event => {
         }),
       });
       form.reset();
-      showAccount(`You’re signed in${user?.name ? ` as ${user.name}` : ''}. Welcome back to Amadee-Stiches.`, user);
+      redirectToDashboard(user);
     } else if (page === 'signup') {
       if (!strongPassword(values.password)) {
         throw new Error('Use at least 10 characters, including an uppercase letter, a lowercase letter, and a number.');
@@ -215,7 +210,7 @@ async function init() {
   try {
     const { user } = await api('/auth/me');
     if ((page === 'signin' || page === 'signup') && user) {
-      showAccount('You’re already signed in. Welcome back.', user);
+      redirectToDashboard(user);
     }
   } catch (error) {
     if (error.status !== 401) {

@@ -1,9 +1,10 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID, createHash, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import User from "../models/User.js";
+import AdminBootstrap from "../models/AdminBootstrap.js";
 import {
   issueOtp,
   hashOtp,
@@ -131,7 +132,10 @@ function clearSession(res) {
    POST /api/auth/signup
 ========================================================= */
 
-async function registerAccount(req, res, next, role) {
+async function registerAccount(req, res, next, role, bootstrapClaimToken) {
+  let bootstrapClaimed = false;
+  let createdUser;
+
   try {
     const parsed = signupSchema.safeParse(req.body);
 
@@ -146,23 +150,21 @@ async function registerAccount(req, res, next, role) {
     const email = normalizeEmail(parsed.data.email);
 
     if (role === "admin") {
-      const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || "");
-      if (!adminEmail) {
-        return res.status(503).json({
-          message:
-            "Admin registration is not configured. Set ADMIN_EMAIL in the backend environment and restart or redeploy the API.",
-        });
-      }
-
-      if (email !== adminEmail) {
-        return res.status(403).json({
-          message: "This email address is not authorized for admin registration.",
-        });
-      }
-
       if (await User.exists({ role: "admin" })) {
         return res.status(409).json({
           message: "An administrator account has already been registered.",
+        });
+      }
+
+      bootstrapClaimed = await AdminBootstrap.claimInitialAdmin(
+        bootstrapClaimToken,
+        new Date(Date.now() + 10 * 60 * 1000)
+      );
+
+      if (!bootstrapClaimed) {
+        return res.status(409).json({
+          message:
+            "Admin registration is already in progress or the one-time setup has been used.",
         });
       }
     }
@@ -170,12 +172,16 @@ async function registerAccount(req, res, next, role) {
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
+      if (bootstrapClaimed) {
+        await AdminBootstrap.releaseInitialAdminClaim(bootstrapClaimToken);
+        bootstrapClaimed = false;
+      }
       return res.status(409).json({
         message: "An account with this email already exists.",
       });
     }
 
-    const user = await User.create({
+    createdUser = await User.create({
       name,
       email,
       passwordHash: await bcrypt.hash(password, 12),
@@ -187,7 +193,12 @@ async function registerAccount(req, res, next, role) {
     try {
       otpData = await issueOtp(email);
     } catch (error) {
-      await User.deleteOne({ _id: user._id });
+      await User.deleteOne({ _id: createdUser._id });
+      createdUser = null;
+      if (bootstrapClaimed) {
+        await AdminBootstrap.releaseInitialAdminClaim(bootstrapClaimToken);
+        bootstrapClaimed = false;
+      }
 
       return res.status(503).json({
         message:
@@ -197,11 +208,22 @@ async function registerAccount(req, res, next, role) {
 
     // Persist the OTP hash and expiry to the User document so that
     // the verifyOtp controller can look it up from the database.
-    user.verificationOtpHash = otpData.hash;
-    user.verificationOtpPurpose = "verify";
-    user.verificationOtpExpiresAt = otpData.expiresAt;
-    user.verificationOtpAttempts = 0;
-    await user.save();
+    createdUser.verificationOtpHash = otpData.hash;
+    createdUser.verificationOtpPurpose = "verify";
+    createdUser.verificationOtpExpiresAt = otpData.expiresAt;
+    createdUser.verificationOtpAttempts = 0;
+    await createdUser.save();
+
+    if (bootstrapClaimed) {
+      const consumed = await AdminBootstrap.consumeInitialAdminClaim(
+        bootstrapClaimToken,
+        createdUser._id
+      );
+      if (!consumed) {
+        throw new Error("Unable to finalize the one-time admin registration.");
+      }
+      bootstrapClaimed = false;
+    }
 
     return res.status(201).json({
       success: true,
@@ -210,7 +232,19 @@ async function registerAccount(req, res, next, role) {
       requiresVerification: true,
     });
   } catch (error) {
+    if (role === "admin" && createdUser) {
+      await User.deleteOne({ _id: createdUser._id });
+    }
+    if (bootstrapClaimed) {
+      await AdminBootstrap.releaseInitialAdminClaim(bootstrapClaimToken);
+    }
+
     if (error?.code === 11000) {
+      if (role === "admin") {
+        return res.status(409).json({
+          message: "An administrator account has already been registered.",
+        });
+      }
       return res.status(409).json({
         message: "An account with this email already exists.",
       });
@@ -225,7 +259,29 @@ export function signup(req, res, next) {
 }
 
 export function registerAdmin(req, res, next) {
-  return registerAccount(req, res, next, "admin");
+  const configuredKey = process.env.ADMIN_REGISTRATION_KEY;
+  const suppliedKey = req.get("x-admin-registration-key");
+
+  if (!configuredKey || configuredKey.length < 32) {
+    return res.status(503).json({
+      message:
+        "Admin registration is not configured. Set ADMIN_REGISTRATION_KEY to a secret of at least 32 characters in the backend environment.",
+    });
+  }
+
+  if (
+    typeof suppliedKey !== "string" ||
+    !timingSafeEqual(
+      createHash("sha256").update(suppliedKey).digest(),
+      createHash("sha256").update(configuredKey).digest()
+    )
+  ) {
+    return res.status(403).json({
+      message: "Admin registration setup key is invalid.",
+    });
+  }
+
+  return registerAccount(req, res, next, "admin", randomUUID());
 }
 
 /* =========================================================
