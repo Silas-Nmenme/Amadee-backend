@@ -25,6 +25,5 @@
 .auth-status[data-error="true"] { background: #fff0ed; border-color: var(--danger); color: var(--danger); }
 .auth-footer { display: flex; justify-content: space-between; gap: 1rem; padding: 1.4rem clamp(1.5rem, 4vw, 4rem); border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; }
 .auth-footer div { display: flex; gap: 1.2rem; }
-#account-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
 [hidden] { display: none !important; }
 @media (max-width: 760px) { .auth-layout { grid-template-columns: 1fr; min-height: calc(100dvh - 170px); } .auth-story { display: none; } .auth-panel { padding: 2.5rem 1.5rem; } .header-inner { padding-inline: 1rem; gap: .7rem; } .brand { font-size: .95rem; } .back-to-shop { font-size: .8rem; } .auth-footer { flex-wrap: wrap; } }

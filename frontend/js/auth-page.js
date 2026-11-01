@@ -189,18 +189,6 @@ if (verificationPanel) {
   });
 }
 
-document.getElementById('sign-out')?.addEventListener('click', async event => {
-  const button = event.currentTarget;
-  setBusy(button, true);
-  try {
-    await api('/auth/logout', { method: 'POST' });
-    window.location.assign('./signin.html');
-  } catch (error) {
-    message(error.message, true);
-    setBusy(button, false);
-  }
-});
-
 async function init() {
   if (page === 'reset-password') {
     const email = new URLSearchParams(window.location.search).get('email');
