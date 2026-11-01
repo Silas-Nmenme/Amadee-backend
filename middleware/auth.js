@@ -56,12 +56,22 @@ export const requireAuth = async (req, res, next) => {
 
     // Find authenticated user
     const user = await User.findById(userId)
-      .select("-passwordHash");
+      .select("-passwordHash +sessionVersion");
 
     if (!user) {
       return res.status(401).json({
         success: false,
         message: "User account not found.",
+      });
+    }
+
+    if (
+      Number(decoded.sessionVersion || 0) !==
+      Number(user.sessionVersion || 0)
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired authentication token.",
       });
     }
 

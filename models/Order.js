@@ -250,6 +250,16 @@ const orderSchema = new mongoose.Schema(
       default: [],
     },
 
+    inventoryProcessingAt: {
+      type: Date,
+      default: undefined,
+    },
+
+    inventoryDeductedAt: {
+      type: Date,
+      default: undefined,
+    },
+
     paymentChannel: {
       type: String,
       trim: true,

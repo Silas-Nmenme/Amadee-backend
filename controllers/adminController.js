@@ -11,17 +11,12 @@ export const getAdminSummary = async (_req, res, next) => {
   try {
     const [
       orders,
-      paidOrders,
       customers,
       pendingReviews,
       subscribers,
-      revenueRows,
+      paidOrderStats,
     ] = await Promise.all([
       Order.countDocuments(),
-
-      Order.countDocuments({
-        paymentStatus: "paid",
-      }),
 
       User.countDocuments({
         role: "customer",
@@ -44,6 +39,9 @@ export const getAdminSummary = async (_req, res, next) => {
         {
           $group: {
             _id: null,
+            count: {
+              $sum: 1,
+            },
             total: {
               $sum: "$total",
             },
@@ -55,11 +53,11 @@ export const getAdminSummary = async (_req, res, next) => {
     return res.status(200).json({
       summary: {
         orders,
-        paidOrders,
+        paidOrders: paidOrderStats[0]?.count || 0,
         customers,
         pendingReviews,
         subscribers,
-        revenueNgn: revenueRows[0]?.total || 0,
+        revenueNgn: paidOrderStats[0]?.total || 0,
       },
     });
   } catch (err) {

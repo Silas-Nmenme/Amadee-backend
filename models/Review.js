@@ -34,6 +34,12 @@ const reviewSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+
+    moderatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: undefined,
+    },
   },
   {
     timestamps: true,

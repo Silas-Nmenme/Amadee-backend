@@ -9,7 +9,7 @@ async function loadReviews() {
   const list = document.getElementById('moderation-list');
   list.textContent = 'Loading pending reviews…';
   try {
-    const { reviews } = await api('/reviews?pending=true');
+    const { reviews } = await api('/reviews/pending');
     list.replaceChildren();
     if (!reviews.length) list.append(safeText('p', 'No reviews awaiting approval.'));
     for (const review of reviews) {
@@ -20,7 +20,7 @@ async function loadReviews() {
         const button = safeText('button', label, 'button button-outline'); button.type = 'button';
         button.onclick = async () => {
           actions.querySelectorAll('button').forEach(b => { b.disabled = true; });
-          try { await api('/reviews', { method: 'PATCH', body: JSON.stringify({ id: review.id, approved }) }); message(approved ? 'Review published.' : 'Review rejected.'); await loadReviews(); }
+          try { await api(`/reviews/${encodeURIComponent(review.id)}/moderate`, { method: 'PATCH', body: JSON.stringify({ approved }) }); message(approved ? 'Review published.' : 'Review rejected.'); await loadReviews(); }
           catch (error) { message(error.message); actions.querySelectorAll('button').forEach(b => { b.disabled = false; }); }
         };
         actions.append(button);

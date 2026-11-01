@@ -78,7 +78,7 @@ const clearCookieOptions = {
 };
 
 const otpFields =
-  "+verificationOtpHash +verificationOtpExpiresAt +verificationOtpAttempts";
+  "+verificationOtpHash +verificationOtpPurpose +verificationOtpExpiresAt +verificationOtpAttempts";
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -108,6 +108,7 @@ function setSession(res, user) {
     {
       sub: String(user._id),
       role: user.role,
+      sessionVersion: user.sessionVersion || 0,
     },
     process.env.JWT_SECRET,
     {
@@ -182,6 +183,7 @@ export async function signup(req, res, next) {
     // Persist the OTP hash and expiry to the User document so that
     // the verifyOtp controller can look it up from the database.
     user.verificationOtpHash = otpData.hash;
+    user.verificationOtpPurpose = "verify";
     user.verificationOtpExpiresAt = otpData.expiresAt;
     user.verificationOtpAttempts = 0;
     await user.save();
@@ -227,6 +229,7 @@ export async function verifyOtp(req, res, next) {
     if (
       !user ||
       user.verified ||
+      user.verificationOtpPurpose !== "verify" ||
       !user.verificationOtpHash ||
       !user.verificationOtpExpiresAt ||
       user.verificationOtpExpiresAt.getTime() < Date.now() ||
@@ -248,6 +251,7 @@ export async function verifyOtp(req, res, next) {
     if (!matches) {
       if (user.verificationOtpAttempts >= 5) {
         user.verificationOtpHash = undefined;
+        user.verificationOtpPurpose = undefined;
         user.verificationOtpExpiresAt = undefined;
       }
 
@@ -260,6 +264,7 @@ export async function verifyOtp(req, res, next) {
 
     user.verified = true;
     user.verificationOtpHash = undefined;
+    user.verificationOtpPurpose = undefined;
     user.verificationOtpExpiresAt = undefined;
     user.verificationOtpAttempts = 0;
 
@@ -292,7 +297,8 @@ export async function resendOtp(req, res, next) {
 
     const email = normalizeEmail(parsed.data.email);
 
-    const user = await User.findOne({ email }).select(otpFields);
+    const user = await User.findOne({ email })
+      .select(`${otpFields} +sessionVersion`);
 
     if (user && !user.verified) {
       let otpData;
@@ -306,6 +312,7 @@ export async function resendOtp(req, res, next) {
 
       // Persist the new OTP hash and expiry to the User document.
       user.verificationOtpHash = otpData.hash;
+      user.verificationOtpPurpose = "verify";
       user.verificationOtpExpiresAt = otpData.expiresAt;
       user.verificationOtpAttempts = 0;
       await user.save();
@@ -341,7 +348,7 @@ export async function login(req, res, next) {
     const { password } = parsed.data;
 
     const user = await User.findOne({ email })
-      .select("+passwordHash");
+      .select("+passwordHash +sessionVersion");
 
     const passwordMatches = user
       ? await bcrypt.compare(password, user.passwordHash)
@@ -429,6 +436,7 @@ export async function forgotPassword(req, res, next) {
       const otp = String(randomInt(100000, 1000000));
 
       user.verificationOtpHash = hashOtp(otp);
+      user.verificationOtpPurpose = "reset";
 
       user.verificationOtpExpiresAt = new Date(
         Date.now() + 10 * 60 * 1000
@@ -445,6 +453,7 @@ export async function forgotPassword(req, res, next) {
         });
       } catch {
         user.verificationOtpHash = undefined;
+        user.verificationOtpPurpose = undefined;
         user.verificationOtpExpiresAt = undefined;
         user.verificationOtpAttempts = 0;
 
@@ -490,6 +499,7 @@ export async function resetPassword(req, res, next) {
 
     if (
       !user ||
+      user.verificationOtpPurpose !== "reset" ||
       !user.verificationOtpHash ||
       !user.verificationOtpExpiresAt ||
       user.verificationOtpExpiresAt.getTime() < Date.now() ||
@@ -511,6 +521,7 @@ export async function resetPassword(req, res, next) {
     if (!matches) {
       if (user.verificationOtpAttempts >= 5) {
         user.verificationOtpHash = undefined;
+        user.verificationOtpPurpose = undefined;
         user.verificationOtpExpiresAt = undefined;
       }
 
@@ -523,8 +534,10 @@ export async function resetPassword(req, res, next) {
 
     user.passwordHash = await bcrypt.hash(password, 12);
     user.passwordChangedAt = new Date();
+    user.sessionVersion = (user.sessionVersion || 0) + 1;
 
     user.verificationOtpHash = undefined;
+    user.verificationOtpPurpose = undefined;
     user.verificationOtpExpiresAt = undefined;
     user.verificationOtpAttempts = 0;
 

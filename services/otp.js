@@ -1,6 +1,6 @@
 import {
   randomInt,
-  createHash,
+  createHmac,
   timingSafeEqual,
 } from "node:crypto";
 
@@ -8,34 +8,30 @@ import { sendMail } from "./mailer.js";
 import { verificationEmail } from "../templates/emailTemplates.js";
 
 /* =========================================================
-   OTP STORAGE
-========================================================= */
-
-// Temporary in-memory OTP storage.
-// Key: normalized email address.
-const codes = new Map();
-
-/* =========================================================
    CONFIGURATION
 ========================================================= */
 
 const ttl = Number(process.env.OTP_TTL_MINUTES) || 5;
-
-const MAX_ATTEMPTS = 3;
 
 /* =========================================================
    HASH OTP
 ========================================================= */
 
 /**
- * Hash an OTP using SHA-256.
+ * Hash an OTP with a server-held key so database-only disclosures do not
+ * allow offline enumeration of the six-digit code.
  *
  * @param {string|number} otp
  * @returns {string}
  */
 export function hashOtp(otp) {
-  return createHash("sha256")
-    .update(String(otp).trim())
+  const secret = process.env.OTP_SECRET || process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("OTP_SECRET or a 32-character JWT_SECRET must be configured.");
+  }
+
+  return createHmac("sha256", secret)
+    .update(`amadee-otp:${String(otp).trim()}`)
     .digest("hex");
 }
 
@@ -44,7 +40,7 @@ export function hashOtp(otp) {
 ========================================================= */
 
 /**
- * Compare two SHA-256 hashes safely.
+ * Compare two keyed OTP hashes safely.
  *
  * @param {string} hash1
  * @param {string} hash2
@@ -83,7 +79,7 @@ export function safeHashEqual(hash1, hash2) {
  * Generate and email a verification OTP.
  *
  * @param {string} email
- * @returns {Promise<void>}
+ * @returns {Promise<{hash: string, expiresAt: Date}>}
  */
 export async function issueOtp(email) {
   if (!email || typeof email !== "string") {
@@ -99,101 +95,15 @@ export async function issueOtp(email) {
   const hash = hashOtp(otp);
   const expiresAt = new Date(Date.now() + ttl * 60_000);
 
-  // Store hashed OTP, expiration and attempts.
-  codes.set(normalizedEmail, {
-    hash,
-
-    expiresAt: expiresAt.getTime(),
-
-    attempts: 0,
+  await sendMail({
+    to: normalizedEmail,
+    ...verificationEmail({
+      name: normalizedEmail,
+      otp,
+      minutes: ttl,
+    }),
   });
-
-  try {
-    await sendMail({
-      to: normalizedEmail,
-
-      ...verificationEmail({
-        name: normalizedEmail,
-        otp,
-        minutes: ttl,
-      }),
-    });
-  } catch (error) {
-    // Remove the OTP if email delivery fails.
-    codes.delete(normalizedEmail);
-
-    throw error;
-  }
 
   // Return the hash and expiry so callers can persist them to the database.
   return { hash, expiresAt };
-}
-
-/* =========================================================
-   VERIFY OTP
-========================================================= */
-
-/**
- * Verify an OTP.
- *
- * @param {string} email
- * @param {string|number} otp
- * @returns {boolean}
- */
-export function verifyOtp(email, otp) {
-  if (
-    !email ||
-    typeof email !== "string" ||
-    otp == null
-  ) {
-    return false;
-  }
-
-  const key = email.toLowerCase().trim();
-
-  const record = codes.get(key);
-
-  if (!record) {
-    return false;
-  }
-
-  // Reject expired codes.
-  if (Date.now() > record.expiresAt) {
-    codes.delete(key);
-
-    return false;
-  }
-
-  // Count verification attempts.
-  record.attempts += 1;
-
-  // Reject after maximum attempts.
-  if (record.attempts > MAX_ATTEMPTS) {
-    codes.delete(key);
-
-    return false;
-  }
-
-  // Hash submitted OTP.
-  const submittedHash = hashOtp(otp);
-
-  // Compare hashes.
-  const matches = safeHashEqual(
-    submittedHash,
-    record.hash
-  );
-
-  if (!matches) {
-    // Remove OTP after maximum attempts.
-    if (record.attempts >= MAX_ATTEMPTS) {
-      codes.delete(key);
-    }
-
-    return false;
-  }
-
-  // OTP can only be used once.
-  codes.delete(key);
-
-  return true;
 }

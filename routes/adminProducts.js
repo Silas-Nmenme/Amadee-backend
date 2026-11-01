@@ -10,6 +10,7 @@ import {
 
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 
 const router = Router();
 
@@ -59,9 +60,14 @@ router.get("/", getAdminProducts);
 router.post("/", validate(createProductSchema), createProduct);
 
 // PATCH /api/admin/products/:id
-router.patch("/:id", validate(updateProductSchema), updateProduct);
+router.patch(
+  "/:id",
+  validateObjectId(),
+  validate(updateProductSchema),
+  updateProduct
+);
 
 // DELETE /api/admin/products/:id
-router.delete("/:id", deactivateProduct);
+router.delete("/:id", validateObjectId(), deactivateProduct);
 
 export default router;

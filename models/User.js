@@ -53,6 +53,13 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    verificationOtpPurpose: {
+      type: String,
+      enum: ["verify", "reset"],
+      default: "verify",
+      select: false,
+    },
+
     verificationOtpExpiresAt: {
       type: Date,
       select: false,
@@ -78,6 +85,12 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: {
       type: Date,
       default: null,
+      select: false,
+    },
+
+    sessionVersion: {
+      type: Number,
+      default: 0,
       select: false,
     },
   },
