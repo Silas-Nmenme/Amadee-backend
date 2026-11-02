@@ -23,7 +23,7 @@ import connectDB from "./config/db.js";
 const app = express();
 
 const port = Number(process.env.PORT) || 3000;
-const productionFrontendOrigin = "https://amadeestiches.netlify.app";
+const productionFrontendOrigin = "https://amadee.vercel.app";
 const configuredFrontendOrigins = [
   process.env.FRONTEND_ORIGINS,
   process.env.FRONTEND_ORIGIN,

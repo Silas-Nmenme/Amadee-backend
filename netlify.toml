@@ -1,5 +1,0 @@
-[[redirects]]
-  from = "/api/*"
-  to = "https://amadee-backend.vercel.app/api/:splat"
-  status = 200
-  force = true
