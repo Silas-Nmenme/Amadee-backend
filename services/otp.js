@@ -81,7 +81,7 @@ export function safeHashEqual(hash1, hash2) {
  * @param {string} email
  * @returns {Promise<{hash: string, expiresAt: Date}>}
  */
-export async function issueOtp(email) {
+export async function issueOtp(email, name = email) {
   if (!email || typeof email !== "string") {
     throw new Error(
       "A valid email address is required to issue an OTP."
@@ -98,7 +98,7 @@ export async function issueOtp(email) {
   await sendMail({
     to: normalizedEmail,
     ...verificationEmail({
-      name: normalizedEmail,
+      name,
       otp,
       minutes: ttl,
     }),

@@ -10,8 +10,16 @@ import {
   hashOtp,
   safeHashEqual,
 } from "../services/otp.js";
-import { sendMail } from "../services/mailer.js";
-import { passwordResetEmail } from "../templates/emailTemplates.js";
+import {
+  sendBestEffortMail,
+  sendMail,
+} from "../services/mailer.js";
+import {
+  accountWelcomeEmail,
+  adminNewRegistrationEmail,
+  passwordChangedEmail,
+  passwordResetEmail,
+} from "../templates/emailTemplates.js";
 
 /* =========================================================
    VALIDATION SCHEMAS
@@ -191,7 +199,7 @@ async function registerAccount(req, res, next, role, bootstrapClaimToken) {
 
     let otpData;
     try {
-      otpData = await issueOtp(email);
+      otpData = await issueOtp(email, name);
     } catch (error) {
       await User.deleteOne({ _id: createdUser._id });
       createdUser = null;
@@ -224,6 +232,12 @@ async function registerAccount(req, res, next, role, bootstrapClaimToken) {
       }
       bootstrapClaimed = false;
     }
+
+    await sendBestEffortMail({
+      event: "New account registration",
+      to: process.env.SHOP_OWNER_EMAIL,
+      ...adminNewRegistrationEmail(createdUser),
+    });
 
     return res.status(201).json({
       success: true,
@@ -349,6 +363,12 @@ export async function verifyOtp(req, res, next) {
 
     await user.save();
 
+    await sendBestEffortMail({
+      event: "Account verification welcome",
+      to: user.email,
+      ...accountWelcomeEmail(user),
+    });
+
     return res.json({
       success: true,
       message: "Email verified successfully.",
@@ -382,7 +402,7 @@ export async function resendOtp(req, res, next) {
     if (user && !user.verified) {
       let otpData;
       try {
-        otpData = await issueOtp(user.email);
+        otpData = await issueOtp(user.email, user.name);
       } catch {
         return res.status(503).json({
           message: "Unable to send verification code right now.",
@@ -650,6 +670,12 @@ export async function resetPassword(req, res, next) {
     await user.save();
 
     clearSession(res);
+
+    await sendBestEffortMail({
+      event: "Password changed security notice",
+      to: user.email,
+      ...passwordChangedEmail(user),
+    });
 
     return res.json({
       success: true,

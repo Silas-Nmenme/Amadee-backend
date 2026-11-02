@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import { sendMail } from "../services/mailer.js";
+import { sendBestEffortMail } from "../services/mailer.js";
 import {
+  adminNewOrderEmail,
   orderReceivedEmail,
   orderStatusEmail,
 } from "../templates/emailTemplates.js";
@@ -19,10 +20,6 @@ const promoCodes = {};
 
 function createHttpError(message, status = 400) {
   return Object.assign(new Error(message), { status });
-}
-
-function formatNaira(amount) {
-  return `₦${Number(amount).toLocaleString("en-NG")}`;
 }
 
 function numericMeasurement(value) {
@@ -52,64 +49,25 @@ function normalizeMeasurements(input = {}) {
 }
 
 async function notifyOwner(order) {
-  if (!process.env.SHOP_OWNER_EMAIL) return;
-
-  const itemSummary = order.items
-    .map(
-      (item) =>
-        `${item.name} (${item.productId}) × ${item.quantity} — ${formatNaira(item.lineTotal)}`
-    )
-    .join("\n");
-
-  await sendMail({
+  await sendBestEffortMail({
+    event: "New order notification",
     to: process.env.SHOP_OWNER_EMAIL,
-    subject: `New Amadee-Stiches order ${order.orderId}`,
-    text: [
-      `Order: ${order.orderId}`,
-      `Customer: ${order.customer.name} (${order.customer.email})`,
-      `Phone: ${order.customer.phone}`,
-      `Address: ${order.customer.address}`,
-      `Delivery option: ${order.deliveryOption}`,
-      "",
-      itemSummary,
-      "",
-      `Subtotal: ${formatNaira(order.subtotal)}`,
-      `Discount: ${formatNaira(order.discount)}`,
-      `Delivery: ${formatNaira(order.deliveryFee)}`,
-      `Total: ${formatNaira(order.total)}`,
-      `Payment method: ${order.paymentMethod}`,
-      `Payment status: ${order.paymentStatus}`,
-    ].join("\n"),
+    ...adminNewOrderEmail(order),
   });
 }
 
 async function notifyCustomer(order) {
   if (!order.customer?.email) return;
 
-  try {
-    await sendMail({
-      to: order.customer.email,
-      ...orderReceivedEmail(order),
-    });
-  } catch (error) {
-    console.error(
-      "Customer order email failed:",
-      error instanceof Error ? error.message : error
-    );
-  }
+  await sendBestEffortMail({
+    event: "Customer order confirmation",
+    to: order.customer.email,
+    ...orderReceivedEmail(order),
+  });
 }
 
 async function notifyOrderParties(order) {
-  await notifyCustomer(order);
-
-  try {
-    await notifyOwner(order);
-  } catch (error) {
-    console.error(
-      "Order notification email failed:",
-      error instanceof Error ? error.message : error
-    );
-  }
+  await Promise.all([notifyCustomer(order), notifyOwner(order)]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -298,6 +256,8 @@ export async function createOrder(req, res, next) {
       orderStatus: "received",
     });
 
+    await notifyOrderParties(order);
+
     // Initialize Paystack for online payments.
     if (body.paymentMethod === "paystack") {
       let response;
@@ -371,8 +331,6 @@ export async function createOrder(req, res, next) {
       order.paymentReference = result.data.reference;
       await order.save();
 
-      await notifyOrderParties(order);
-
       return res.status(201).json({
         orderId: order.orderId,
         subtotal,
@@ -389,8 +347,6 @@ export async function createOrder(req, res, next) {
     }
 
     // Bank transfer and pay-on-delivery orders remain unpaid.
-    await notifyOrderParties(order);
-
     return res.status(201).json({
       orderId: order.orderId,
       orderStatus: order.orderStatus,
@@ -533,22 +489,15 @@ export async function updateOrderStatus(req, res, next) {
       });
     }
 
-    // Email errors must not undo a successful status update.
-    try {
-      if (order.customer?.email) {
-        await sendMail({
-          to: order.customer.email,
-          ...orderStatusEmail({
-            order,
-            status: order.orderStatus,
-          }),
-        });
-      }
-    } catch (error) {
-      console.error(
-        "Order status email failed:",
-        error instanceof Error ? error.message : error
-      );
+    if (order.customer?.email) {
+      await sendBestEffortMail({
+        event: "Order status update",
+        to: order.customer.email,
+        ...orderStatusEmail({
+          order,
+          status: order.orderStatus,
+        }),
+      });
     }
 
     return res.status(200).json({

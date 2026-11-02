@@ -1,4 +1,6 @@
 import Review from "../models/Review.js";
+import { sendBestEffortMail } from "../services/mailer.js";
+import { reviewNotificationEmail } from "../templates/emailTemplates.js";
 
 export async function getApprovedReviews(_req, res, next) {
   try {
@@ -36,6 +38,12 @@ export async function submitReview(req, res, next) {
       rating,
       message,
       approved: false,
+    });
+
+    await sendBestEffortMail({
+      event: "New review notification",
+      to: process.env.SHOP_OWNER_EMAIL,
+      ...reviewNotificationEmail(review),
     });
 
     return res.status(201).json({

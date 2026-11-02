@@ -2,8 +2,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import { sendMail } from "../services/mailer.js";
-import { paymentConfirmedEmail } from "../templates/emailTemplates.js";
+import { sendBestEffortMail } from "../services/mailer.js";
+import {
+  adminPaymentConfirmedEmail,
+  paymentConfirmedEmail,
+} from "../templates/emailTemplates.js";
 
 const PAYSTACK_API = "https://api.paystack.co";
 
@@ -123,19 +126,20 @@ function transactionMatchesOrder(order, transaction, reference) {
  * Email errors should not reverse an otherwise successful payment.
  */
 async function sendPaymentConfirmation(order) {
-  if (!order?.customer?.email) return;
-
-  try {
-    await sendMail({
+  const notifications = [];
+  if (order?.customer?.email) {
+    notifications.push(sendBestEffortMail({
+      event: "Customer payment confirmation",
       to: order.customer.email,
       ...paymentConfirmedEmail(order),
-    });
-  } catch (error) {
-    console.error(
-      "Payment confirmation email failed:",
-      error?.message || error
-    );
+    }));
   }
+  notifications.push(sendBestEffortMail({
+    event: "Admin payment notification",
+    to: process.env.SHOP_OWNER_EMAIL,
+    ...adminPaymentConfirmedEmail(order),
+  }));
+  await Promise.all(notifications);
 }
 
 /**

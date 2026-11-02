@@ -1,5 +1,9 @@
 import Subscriber from "../models/Subscriber.js";
-import { sendMail } from "../services/mailer.js";
+import { sendBestEffortMail } from "../services/mailer.js";
+import {
+  newsletterNotificationEmail,
+  newsletterWelcomeEmail,
+} from "../templates/emailTemplates.js";
 
 export async function submitNewsletterSubscription(req, res, next) {
   try {
@@ -24,20 +28,19 @@ export async function submitNewsletterSubscription(req, res, next) {
       await Subscriber.create({ email });
     }
 
-    if (process.env.SHOP_OWNER_EMAIL) {
-      try {
-        await sendMail({
-          to: process.env.SHOP_OWNER_EMAIL,
-          subject: "New Amadee-Stiches newsletter subscriber",
-          text: `Subscriber: ${email}`,
-        });
-      } catch (error) {
-        console.error(
-          "Newsletter notification failed:",
-          error instanceof Error ? error.message : error
-        );
-      }
-    }
+    const notifications = [
+      sendBestEffortMail({
+        event: "Newsletter welcome",
+        to: email,
+        ...newsletterWelcomeEmail(email),
+      }),
+      sendBestEffortMail({
+        event: "New newsletter subscriber notification",
+        to: process.env.SHOP_OWNER_EMAIL,
+        ...newsletterNotificationEmail(email),
+      }),
+    ];
+    await Promise.all(notifications);
 
     return res.status(201).json({ message: "Subscribed." });
   } catch (error) {

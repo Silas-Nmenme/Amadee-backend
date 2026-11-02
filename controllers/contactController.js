@@ -1,5 +1,6 @@
 import Message from "../models/Message.js";
-import { sendMail } from "../services/mailer.js";
+import { sendBestEffortMail } from "../services/mailer.js";
+import { contactNotificationEmail } from "../templates/emailTemplates.js";
 
 export const submitContactMessage = async (req, res, next) => {
   try {
@@ -12,12 +13,6 @@ export const submitContactMessage = async (req, res, next) => {
       });
     }
 
-    if (!process.env.SHOP_OWNER_EMAIL) {
-      return res.status(503).json({
-        message: "Contact form is temporarily unavailable.",
-      });
-    }
-
     // Save the message before attempting email delivery.
     const savedMessage = await Message.create({
       name,
@@ -25,29 +20,17 @@ export const submitContactMessage = async (req, res, next) => {
       message,
     });
 
-    try {
-      await sendMail({
-        to: process.env.SHOP_OWNER_EMAIL,
-        replyTo: email,
-        subject: `Amadee-Stiches contact form: ${name}`,
-        text: [
-          `From: ${name}`,
-          `Email: ${email}`,
-          "",
-          message,
-          "",
-          `Message ID: ${savedMessage._id}`,
-        ].join("\n"),
-      });
-    } catch (emailError) {
-      // The message is still saved in MongoDB for later review.
-      console.error(
-        "Contact notification email failed:",
-        emailError instanceof Error
-          ? emailError.message
-          : emailError
-      );
-
+    const notified = await sendBestEffortMail({
+      event: "Contact enquiry notification",
+      to: process.env.SHOP_OWNER_EMAIL,
+      ...contactNotificationEmail({
+        name,
+        email,
+        message,
+        messageId: String(savedMessage._id),
+      }),
+    });
+    if (!notified) {
       return res.status(202).json({
         message:
           "Your message was received, but email notification is delayed.",

@@ -23,6 +23,9 @@ function getTransport() {
     secure:
       SMTP_SECURE === "true" ||
       (SMTP_SECURE !== "false" && port === 465),
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
 
     auth: {
       user: SMTP_USER,
@@ -36,6 +39,7 @@ export async function sendMail({
   subject,
   text,
   html,
+  replyTo,
 }) {
   if (!to || !subject || (!text && !html)) {
     throw new Error(
@@ -52,7 +56,15 @@ export async function sendMail({
       subject,
       text,
       html,
+      ...(replyTo ? { replyTo } : {}),
     });
+
+    if (
+      result.rejected?.length ||
+      (Array.isArray(result.accepted) && result.accepted.length === 0)
+    ) {
+      throw new Error("SMTP server did not accept the email recipient.");
+    }
 
     console.log("Email sent successfully:", {
       to,
@@ -73,6 +85,19 @@ export async function sendMail({
     throw error;
   } finally {
     transport.close();
+  }
+}
+
+export async function sendBestEffortMail({ event, ...message }) {
+  try {
+    await sendMail(message);
+    return true;
+  } catch (error) {
+    console.error(
+      `${event || "Notification"} email failed:`,
+      error instanceof Error ? error.message : error
+    );
+    return false;
   }
 }
 
