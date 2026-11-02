@@ -28,7 +28,10 @@ Emails use the configured SMTP settings (`SMTP_HOST`, `SMTP_PORT`,
 and review notifications. The responsive email templates load the official
 store logo from `${STOREFRONT_URL}/assets/images/logo.svg` (default:
 `https://amadee.vercel.app/assets/images/logo.svg`). Customer verification and
-password-reset delivery remains required for those flows; order, payment,
+password-reset delivery remains required for those flows. Password reset is
+enabled by default; set `PASSWORD_RESET_ENABLED=false` only to disable it.
+Reset-email delivery errors are logged with SMTP diagnostics (without message
+content or credentials). Order, payment,
 contact, newsletter, review, and account-notice delivery failures are logged
 without undoing the related action.
 

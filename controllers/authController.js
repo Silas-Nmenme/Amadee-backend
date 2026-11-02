@@ -555,10 +555,7 @@ export async function forgotPassword(req, res, next) {
 
     const user = await User.findOne({ email });
 
-    if (
-      user &&
-      process.env.PASSWORD_RESET_ENABLED === "true"
-    ) {
+    if (user && process.env.PASSWORD_RESET_ENABLED !== "false") {
       const otp = String(randomInt(100000, 1000000));
 
       user.verificationOtpHash = hashOtp(otp);
@@ -577,13 +574,28 @@ export async function forgotPassword(req, res, next) {
           to: user.email,
           ...passwordResetEmail({ otp }),
         });
-      } catch {
+      } catch (error) {
         user.verificationOtpHash = undefined;
         user.verificationOtpPurpose = undefined;
         user.verificationOtpExpiresAt = undefined;
         user.verificationOtpAttempts = 0;
 
-        await user.save();
+        try {
+          await user.save();
+        } catch (cleanupError) {
+          console.error("Could not clear failed password-reset code:", {
+            message: cleanupError instanceof Error
+              ? cleanupError.message
+              : cleanupError,
+          });
+        }
+
+        console.error("Password reset email failed:", {
+          message: error instanceof Error ? error.message : error,
+          code: error?.code,
+          responseCode: error?.responseCode,
+          command: error?.command,
+        });
 
         return res.status(503).json({
           message:
