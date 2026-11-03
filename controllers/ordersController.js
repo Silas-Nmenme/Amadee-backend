@@ -437,9 +437,27 @@ export async function getAdminOrders(req, res, next) {
         .lean(),
       Order.countDocuments(),
     ]);
+    const productCodes = [
+      ...new Set(orders.flatMap(order => (order.items || []).map(item => item.productId))),
+    ];
+    const products = productCodes.length
+      ? await Product.find({ productCode: { $in: productCodes } })
+        .select("productCode images")
+        .lean()
+      : [];
+    const imageByProductCode = new Map(
+      products.map(product => [product.productCode, product.images?.[0] || ""])
+    );
+    const ordersWithImages = orders.map(order => ({
+      ...order,
+      items: (order.items || []).map(item => ({
+        ...item,
+        image: imageByProductCode.get(item.productId) || "",
+      })),
+    }));
 
     return res.status(200).json({
-      orders,
+      orders: ordersWithImages,
       pagination: {
         page,
         limit,

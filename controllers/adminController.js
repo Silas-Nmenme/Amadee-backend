@@ -33,14 +33,17 @@ export const getAdminSummary = async (_req, res, next) => {
       Order.aggregate([
         {
           $match: {
-            paymentStatus: "paid",
+            $or: [
+              { paymentStatus: "paid" },
+              { orderStatus: "completed", paymentStatus: { $ne: "refunded" } },
+            ],
           },
         },
         {
           $group: {
             _id: null,
-            count: {
-              $sum: 1,
+            paidCount: {
+              $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] },
             },
             total: {
               $sum: "$total",
@@ -53,7 +56,7 @@ export const getAdminSummary = async (_req, res, next) => {
     return res.status(200).json({
       summary: {
         orders,
-        paidOrders: paidOrderStats[0]?.count || 0,
+        paidOrders: paidOrderStats[0]?.paidCount || 0,
         customers,
         pendingReviews,
         subscribers,

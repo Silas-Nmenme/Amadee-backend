@@ -1,5 +1,6 @@
 import { api, formatNaira, safeText } from './modules/utils.js';
 import { initAuth } from './modules/auth.js';
+import { openModal } from './modules/modal.js';
 
 const byId = id => document.getElementById(id);
 const dashboard = byId('admin-dashboard');
@@ -56,7 +57,7 @@ async function loadSummary() {
       summaryCard('Customers', summary.customers),
       summaryCard('Pending reviews', summary.pendingReviews),
       summaryCard('Active subscribers', summary.subscribers),
-      summaryCard('Paid revenue', formatNaira(summary.revenueNgn)),
+      summaryCard('Total revenue', formatNaira(summary.revenueNgn)),
     );
     setStatus('summary-status', '');
   } catch (error) {
@@ -64,21 +65,109 @@ async function loadSummary() {
   }
 }
 
+function safeImageUrl(value) {
+  try {
+    const url = new URL(value, window.location.href);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function openOrderDetails(order) {
+  openModal(`Order ${order.orderId || ''}`, modal => {
+    const customer = order.customer || {};
+    const itemsHeading = safeText('h3', 'Items');
+    const items = document.createElement('div');
+    items.className = 'order-detail-items';
+    for (const item of order.items || []) {
+      const row = document.createElement('article');
+      row.className = 'order-detail-item';
+      const imageUrl = safeImageUrl(item.image);
+      if (imageUrl) {
+        const image = document.createElement('img');
+        image.src = imageUrl;
+        image.alt = item.name || 'Product image';
+        image.loading = 'lazy';
+        row.append(image);
+      } else {
+        row.append(safeText('div', 'Image unavailable', 'order-image-placeholder'));
+      }
+      const details = document.createElement('div');
+      details.append(
+        safeText('strong', item.name || item.productId || 'Product'),
+        safeText('p', `Code: ${item.productId || '—'} · Quantity: ${item.quantity}`),
+        safeText('p', `Size: ${item.size || '—'} · Colour: ${item.colour || '—'}`),
+        safeText('p', `Unit price: ${formatNaira(item.unitPrice)} · Line total: ${formatNaira(item.lineTotal)}`),
+      );
+      row.append(details);
+      items.append(row);
+    }
+
+    modal.append(
+      safeText('p', `${customer.name || 'Customer'} · ${customer.email || ''} · ${customer.phone || ''}`),
+      safeText('p', `Order status: ${labelize(order.orderStatus)} · Payment: ${labelize(order.paymentStatus)} via ${labelize(order.paymentMethod)}`),
+      safeText('p', `Placed: ${displayDate(order.createdAt)} · Delivery: ${labelize(order.deliveryOption)} · ${customer.address || 'No address'}`),
+      itemsHeading,
+      items,
+    );
+
+    const measurements = order.measurements || {};
+    const measurementParts = [
+      ['Bust/chest', measurements.bustChest],
+      ['Waist', measurements.waist],
+      ['Hip', measurements.hip],
+      ['Length', measurements.length],
+    ].filter(([, value]) => value != null)
+      .map(([label, value]) => `${label}: ${value} cm`);
+    if (measurementParts.length || measurements.notes) {
+      modal.append(
+        safeText('h3', 'Measurements and notes'),
+        safeText('p', [...measurementParts, measurements.notes].filter(Boolean).join(' · ') || 'No measurements provided.'),
+      );
+    }
+    if (order.statusHistory?.length) {
+      modal.append(safeText('h3', 'Status history'));
+      const history = document.createElement('ul');
+      for (const entry of order.statusHistory) {
+        history.append(safeText('li', `${displayDate(entry.at)} · ${labelize(entry.status)}${entry.note ? ` — ${entry.note}` : ''}`));
+      }
+      modal.append(history);
+    }
+    modal.append(
+      safeText('p', `Subtotal: ${formatNaira(order.subtotal)} · Discount: ${formatNaira(order.discount)} · Delivery: ${formatNaira(order.deliveryFee)}`),
+      safeText('strong', `Order total: ${formatNaira(order.total)}`),
+    );
+  });
+}
+
 function renderOrder(order) {
   const card = document.createElement('article');
-  card.className = 'admin-record';
+  card.className = 'admin-record admin-order-record';
   const customer = order.customer || {};
-  const itemSummary = (order.items || [])
-    .map(item => `${item.name} × ${item.quantity}${item.size ? ` · ${item.size}` : ''}${item.colour ? ` · ${item.colour}` : ''}`)
-    .join(', ');
   const details = document.createElement('div');
   details.className = 'admin-record-details';
+  const openButton = safeText('button', order.orderId || 'Order', 'order-detail-trigger');
+  openButton.type = 'button';
+  openButton.onclick = () => openOrderDetails(order);
   details.append(
-    safeText('h3', order.orderId || 'Order'),
+    openButton,
     safeText('p', `${customer.name || 'Customer'} · ${customer.email || ''} · ${customer.phone || ''}`),
-    safeText('p', `${itemSummary || 'No item details'} · ${formatNaira(order.total)} · ${labelize(order.paymentMethod)} / ${labelize(order.paymentStatus)}`),
-    safeText('p', `${customer.address || 'No address'} · ${labelize(order.deliveryOption)} · ${displayDate(order.createdAt)}`),
+    safeText('p', `${(order.items || []).length} item line${(order.items || []).length === 1 ? '' : 's'} · ${formatNaira(order.total)} · ${labelize(order.paymentStatus)} · ${displayDate(order.createdAt)}`),
   );
+  const images = document.createElement('div');
+  images.className = 'order-image-strip';
+  for (const item of (order.items || []).slice(0, 4)) {
+    const imageUrl = safeImageUrl(item.image);
+    if (!imageUrl) continue;
+    const image = document.createElement('img');
+    image.src = imageUrl;
+    image.alt = item.name || 'Order item';
+    image.loading = 'lazy';
+    image.title = item.name || '';
+    images.append(image);
+  }
+  if (images.childElementCount) details.append(images);
   const controls = document.createElement('div');
   controls.className = 'admin-record-controls';
   const label = safeText('label', 'Order status');
