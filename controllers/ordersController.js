@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import User from "../models/User.js";
 import { sendBestEffortMail } from "../services/mailer.js";
 import {
   adminNewOrderEmail,
@@ -233,15 +234,17 @@ export async function createOrder(req, res, next) {
       .toUpperCase()}-${randomUUID().slice(0, 6).toUpperCase()}`;
 
     const measurements = normalizeMeasurements(body.measurements);
-    const customer = req.user
-      ? { ...body.customer, email: req.user.email }
-      : body.customer;
+    const customer = {
+      ...body.customer,
+      name: req.user.name,
+      email: req.user.email,
+    };
 
     // Save the order before initializing Paystack so the transaction
     // reference can be associated with a persistent order.
     const order = await Order.create({
       orderId,
-      ...(req.user ? { user: req.user._id } : {}),
+      user: req.user._id,
       customer,
       items,
       deliveryOption: body.deliveryOption,
@@ -255,8 +258,6 @@ export async function createOrder(req, res, next) {
       paymentStatus: "pending",
       orderStatus: "received",
     });
-
-    await notifyOrderParties(order);
 
     // Initialize Paystack for online payments.
     if (body.paymentMethod === "paystack") {
@@ -331,6 +332,9 @@ export async function createOrder(req, res, next) {
       order.paymentReference = result.data.reference;
       await order.save();
 
+      await clearCustomerCart(req.user._id);
+      await notifyOrderParties(order);
+
       return res.status(201).json({
         orderId: order.orderId,
         subtotal,
@@ -347,6 +351,9 @@ export async function createOrder(req, res, next) {
     }
 
     // Bank transfer and pay-on-delivery orders remain unpaid.
+    await clearCustomerCart(req.user._id);
+    await notifyOrderParties(order);
+
     return res.status(201).json({
       orderId: order.orderId,
       orderStatus: order.orderStatus,
@@ -367,6 +374,16 @@ export async function createOrder(req, res, next) {
   }
 }
 
+async function clearCustomerCart(userId) {
+  try {
+    await User.updateOne({ _id: userId }, { $set: { cartItems: [] } });
+  } catch (error) {
+    console.error("Could not clear cart after order:", {
+      message: error instanceof Error ? error.message : error,
+    });
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* CUSTOMER ORDER HISTORY                                                     */
 /* GET /api/orders/mine                                                       */
@@ -374,18 +391,11 @@ export async function createOrder(req, res, next) {
 
 export async function getMyOrders(req, res, next) {
   try {
-    const email = req.user?.email?.toLowerCase();
-
-    if (!email) {
+    if (!req.user?._id) {
       throw createHttpError("Unable to identify the authenticated user.", 401);
     }
 
-    const orders = await Order.find({
-      $or: [
-        { user: req.user._id },
-        { "customer.email": email },
-      ],
-    })
+    const orders = await Order.find({ user: req.user._id })
       .select(
         "orderId items subtotal discount deliveryFee total paymentMethod paymentStatus paymentReference orderStatus createdAt"
       )

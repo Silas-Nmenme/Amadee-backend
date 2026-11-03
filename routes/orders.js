@@ -15,7 +15,6 @@ import {
 import { validate } from "../middleware/validate.js";
 import { formLimiter } from "../middleware/rateLimit.js";
 import {
-  optionalAuth,
   requireAuth,
   requireAdmin,
 } from "../middleware/auth.js";
@@ -30,7 +29,7 @@ const router = Router();
 router.post(
   "/",
   formLimiter,
-  optionalAuth,
+  requireAuth,
   validate(orderSchema),
   createOrder
 );

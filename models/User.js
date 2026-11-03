@@ -1,5 +1,40 @@
 import mongoose from "mongoose";
 
+const cartItemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 40,
+    },
+    size: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: "",
+    },
+    colour: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: "",
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 20,
+      validate: Number.isInteger,
+    },
+    snapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
+    },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     /* ---------------------------------------------------------------------- */
@@ -41,6 +76,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
       index: true,
+    },
+
+    cartItems: {
+      type: [cartItemSchema],
+      default: [],
+    },
+
+    wishlistProductIds: {
+      type: [String],
+      default: [],
     },
 
     /* ---------------------------------------------------------------------- */

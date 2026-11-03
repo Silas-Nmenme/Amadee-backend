@@ -3,6 +3,8 @@ import { api, byId, safeText, formatNaira } from './modules/utils.js';
 import { openModal, closeModal } from './modules/modal.js';
 import { isApiCatalogueLoaded, loadProductsCatalogue } from './modules/products.js';
 import { setShopWhatsappNumber } from './config.js';
+import { getCurrentUser } from './modules/account-data.js';
+import { initAuth } from './modules/auth.js';
 const delivery = { pickup: { fee: 0, label: 'Pick-up', time: 'Arrange a collection time with our team.' }, lagos: { fee: 2000, label: 'Within Lagos', time: 'Estimated 2–5 business days after production.' }, outside: { fee: 5000, label: 'Outside Lagos', time: 'Estimated 4–8 business days after production.' } };
 let busy = false;
 let checkoutAddressInput = null;
@@ -105,6 +107,19 @@ function whatsappCheckout() {
 }
 async function checkout() {
   if (busy || !getCart().length) return;
+  let user;
+  try {
+    user = await getCurrentUser({ refresh: true });
+  } catch (error) {
+    byId('cart-status').textContent = `We could not verify your sign-in: ${error.message}`;
+    return;
+  }
+  if (!user) {
+    const returnTo = encodeURIComponent('/cart.html?checkout=1');
+    window.location.assign(`./signin.html?returnTo=${returnTo}`);
+    return;
+  }
+
   await loadProductsCatalogue();
   if (!isApiCatalogueLoaded()) {
     whatsappCheckout();
@@ -147,6 +162,14 @@ async function checkout() {
       input.required = required;
       input.maxLength = maxLength;
       input.autocomplete = autocomplete;
+      if (name === 'name') {
+        input.value = user.name || '';
+        input.readOnly = true;
+      }
+      if (name === 'email') {
+        input.value = user.email || '';
+        input.readOnly = true;
+      }
       if (name === 'phone') input.minLength = 7;
       if (name === 'name') input.minLength = 2;
       if (name === 'address') {
@@ -188,19 +211,6 @@ async function checkout() {
     const submit = safeText('button', 'Place order', 'button');
     submit.type = 'submit';
     form.append(submit);
-    api('/auth/me')
-      .then(({ user }) => {
-        const name = form.elements.namedItem('name');
-        const email = form.elements.namedItem('email');
-        if (name && !name.value) name.value = user.name || '';
-        if (email && !email.value) email.value = user.email || '';
-        if (email && user.email) email.readOnly = true;
-      })
-      .catch(error => {
-        if (error.status !== 401) {
-          status.textContent = `Your profile could not be prefilled: ${error.message}. You can still enter your details.`;
-        }
-      });
     form.onsubmit = async event => {
       event.preventDefault();
       if (!form.reportValidity() || submit.disabled) return;
@@ -212,8 +222,8 @@ async function checkout() {
           method: 'POST',
           body: JSON.stringify({
             customer: {
-              name: values.name.trim(),
-              email: values.email.trim(),
+              name: user.name,
+              email: user.email,
               phone: values.phone.trim(),
               address: byId('delivery').value === 'pickup' ? 'Pick-up' : values.address.trim(),
             },
@@ -227,6 +237,10 @@ async function checkout() {
             measurements: { notes: values.notes.trim() },
             paymentMethod: values.paymentMethod,
           }),
+        });
+
+        await clearCart().catch(error => {
+          console.error('Could not clear cart after successful order:', error.message);
         });
 
         if (result.authorizationUrl) {
@@ -268,8 +282,13 @@ async function start(retry = false) {
     await catalogue;
     render();
     byId('cart-status').textContent = 'Your selections are saved for your next visit.';
+    if (new URLSearchParams(window.location.search).get('checkout') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      await checkout();
+    }
   }
   catch (error) { byId('cart-status').textContent = `Your cart is unavailable right now: ${error.message}`; byId('retry-cart').hidden = false; }
 }
 byId('retry-cart').onclick = () => start(true);
+initAuth();
 start();

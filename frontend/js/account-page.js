@@ -1,9 +1,13 @@
 import { api, safeText, formatNaira } from './modules/utils.js';
+import { clearLocalAccountData } from './modules/account-data.js';
+import { initAuth } from './modules/auth.js';
 
 const status = document.getElementById('account-status');
 const profile = document.getElementById('profile-form');
 const panel = document.getElementById('account-panel');
 const message = text => { status.textContent = text; };
+
+initAuth();
 
 async function loadOrders() {
   const list = document.getElementById('orders-list');
@@ -103,6 +107,7 @@ document.getElementById('account-signout').onclick = async event => {
   button.disabled = true;
   try {
     await api('/auth/logout', { method: 'POST' });
+    clearLocalAccountData();
     window.location.assign('./signin.html');
   } catch (error) {
     message(error.message);

@@ -1,15 +1,20 @@
 import { api } from './utils.js';
 
 export async function initAuth() {
-  const button = document.getElementById('open-auth');
-  if (!button) return;
+  const buttons = document.querySelectorAll('#open-auth, [data-auth-link]');
+  if (!buttons.length) return;
 
-  button.href = './signin.html';
+  buttons.forEach(button => {
+    button.textContent = 'Sign in';
+    button.href = './signin.html';
+  });
   try {
     const { user } = await api('/auth/me');
-    button.textContent = user.role === 'admin' ? 'Admin dashboard' : 'My account';
-    button.href = user.role === 'admin' ? './admin.html' : './account.html';
+    buttons.forEach(button => {
+      button.textContent = user.role === 'admin' ? 'Admin dashboard' : 'My account';
+      button.href = user.role === 'admin' ? './admin.html' : './account.html';
+    });
   } catch {
-    // Keep the sign-in link available when no valid backend session exists.
+    // Keep the sign-in links available when no valid backend session exists.
   }
 }

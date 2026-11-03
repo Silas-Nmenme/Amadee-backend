@@ -2,10 +2,18 @@ import { products } from '../data/products.js';
 import { byId, formatNaira } from './utils.js';
 import { toast } from './toast.js';
 import { getWhatsappNumber } from '../config.js';
-const storageKey = 'amadee-stiches-cart-v1';
+import {
+  CART_OWNER_STORAGE_KEY,
+  CART_SYNC_DIRTY_STORAGE_KEY,
+  CART_STORAGE_KEY,
+  getAccountPreferences,
+  saveAccountCart,
+} from './account-data.js';
+const storageKey = CART_STORAGE_KEY;
 let cart = [];
 let queue = Promise.resolve();
 let loaded = false;
+let accountUserId = null;
 
 function productFromSnapshot(snapshot) {
   if (
@@ -33,8 +41,35 @@ function readCart() {
       item.quantity <= 20;
   });
 }
+function mergeCart(accountItems, localItems) {
+  const merged = new Map();
+  for (const item of [...accountItems, ...localItems]) {
+    const key = `${item.id}|${item.size.toLowerCase()}|${item.colour.toLowerCase()}`;
+    const existing = merged.get(key);
+    if (existing) {
+      existing.quantity = Math.min(20, existing.quantity + item.quantity);
+      existing.snapshot ||= item.snapshot;
+    } else {
+      merged.set(key, { ...item });
+    }
+  }
+  return [...merged.values()];
+}
+function accountCartItems(items) {
+  return items.map(item => ({
+    productId: item.id,
+    size: item.size,
+    colour: item.colour,
+    quantity: item.quantity,
+    ...(item.snapshot ? { snapshot: item.snapshot } : {}),
+  }));
+}
 function saveCart(items) {
   localStorage.setItem(storageKey, JSON.stringify(items));
+  if (accountUserId) {
+    localStorage.setItem(CART_OWNER_STORAGE_KEY, accountUserId);
+    localStorage.setItem(CART_SYNC_DIRTY_STORAGE_KEY, accountUserId);
+  }
   cart = items;
   notify();
 }
@@ -44,8 +79,53 @@ function notify() {
   window.dispatchEvent(new CustomEvent('amadee:cart-change'));
 }
 export async function loadCart() {
-  cart = readCart();
-  localStorage.setItem(storageKey, JSON.stringify(cart));
+  const localItems = readCart();
+  const savedOwner = localStorage.getItem(CART_OWNER_STORAGE_KEY);
+  const account = await getAccountPreferences();
+
+  if (account) {
+    accountUserId = account.user.id;
+    const transferableItems = savedOwner ? [] : localItems;
+    const accountItems = (account.preferences.cartItems || []).map(item => ({
+      id: item.productId,
+      size: item.size,
+      colour: item.colour,
+      quantity: item.quantity,
+      ...(item.snapshot ? { snapshot: item.snapshot } : {}),
+    })).filter(item =>
+      typeof item.id === 'string' &&
+      typeof item.size === 'string' &&
+      typeof item.colour === 'string' &&
+      Number.isInteger(item.quantity) &&
+      item.quantity >= 1 &&
+      item.quantity <= 20
+    );
+    const dirtyOwner = localStorage.getItem(CART_SYNC_DIRTY_STORAGE_KEY);
+    cart = dirtyOwner === accountUserId && savedOwner === accountUserId
+      ? localItems
+      : mergeCart(accountItems, transferableItems);
+    localStorage.setItem(CART_OWNER_STORAGE_KEY, accountUserId);
+    localStorage.setItem(storageKey, JSON.stringify(cart));
+    localStorage.setItem(CART_SYNC_DIRTY_STORAGE_KEY, accountUserId);
+    try {
+      await saveAccountCart(accountCartItems(cart));
+    } catch (error) {
+      console.error('Cart account sync failed:', error.message);
+      toast('Your cart is available on this device, but account sync failed.', 'error');
+    }
+  } else {
+    accountUserId = null;
+    if (savedOwner) {
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(CART_OWNER_STORAGE_KEY);
+      localStorage.removeItem(CART_SYNC_DIRTY_STORAGE_KEY);
+      cart = [];
+    } else {
+      cart = localItems;
+      localStorage.setItem(storageKey, JSON.stringify(cart));
+    }
+  }
+
   loaded = true;
   notify();
 }
@@ -55,6 +135,14 @@ function mutate(change) {
     const next = cart.map(x => ({ ...x }));
     change(next);
     saveCart(next);
+    if (accountUserId) {
+      try {
+        await saveAccountCart(accountCartItems(next));
+      } catch (error) {
+        console.error('Cart account sync failed:', error.message);
+        toast('Your cart was saved on this device, but could not sync to your account.', 'error');
+      }
+    }
   });
   return queue.catch(err => { toast(err.message, 'error'); throw err; });
 }

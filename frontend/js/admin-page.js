@@ -1,4 +1,5 @@
 import { api, formatNaira, safeText } from './modules/utils.js';
+import { initAuth } from './modules/auth.js';
 
 const byId = id => document.getElementById(id);
 const dashboard = byId('admin-dashboard');
@@ -19,6 +20,8 @@ const orderStatuses = [
 ];
 let currentPage = 1;
 let totalPages = 1;
+
+initAuth();
 
 function setStatus(id, message) {
   byId(id).textContent = message;

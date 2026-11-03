@@ -17,10 +17,13 @@ Set `OTP_SECRET` to a random secret of at least 32 characters for keyed OTP
 hashing; `JWT_SECRET` is used as a fallback when `OTP_SECRET` is not set.
 
 The storefront uses the backend's email/OTP/JWT authentication, product,
-order, review, contact, and newsletter endpoints. Cart and wishlist selections
-remain in browser storage because the backend does not expose those endpoints.
-The bundled product list remains available when the backend catalogue is empty;
-online order submission is enabled for products returned by the backend.
+order, review, contact, newsletter, and account-preference endpoints. Cart and
+wishlist selections sync to the signed-in account; guest selections are kept
+locally and merged on the first sign-in. Order creation requires authentication,
+and customers can only see orders associated with their account. The bundled
+product list remains available when the backend catalogue is empty; checkout
+requires sign-in even when the storefront offers a WhatsApp order-request
+fallback.
 
 Emails use the configured SMTP settings (`SMTP_HOST`, `SMTP_PORT`,
 `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and optional `MAIL_FROM`). Set

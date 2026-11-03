@@ -24,6 +24,33 @@ function redirectToDashboard(user) {
   window.location.assign(dashboardForRole(user?.role));
 }
 
+function redirectAfterSignIn(user) {
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+  if (returnTo) {
+    try {
+      const destination = new URL(returnTo, window.location.origin);
+      if (
+        destination.origin === window.location.origin &&
+        destination.pathname === new URL('./cart.html', window.location.href).pathname &&
+        destination.searchParams.get('checkout') === '1'
+      ) {
+        window.location.assign(`${destination.pathname}?checkout=1`);
+        return;
+      }
+    } catch {
+      // Ignore an invalid return destination and use the normal dashboard.
+    }
+  }
+  redirectToDashboard(user);
+}
+
+function authPageUrl(target) {
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+  return returnTo
+    ? `./${target}.html?returnTo=${encodeURIComponent(returnTo)}`
+    : `./${target}.html`;
+}
+
 function showVerification(email, text) {
   form.hidden = true;
   verificationPanel.hidden = false;
@@ -95,7 +122,7 @@ form.addEventListener('submit', async event => {
         }),
       });
       form.reset();
-      redirectToDashboard(user);
+      redirectAfterSignIn(user);
     } else if (page === 'signup') {
       if (!strongPassword(values.password)) {
         throw new Error('Use at least 10 characters, including an uppercase letter, a lowercase letter, and a number.');
@@ -180,7 +207,7 @@ if (verificationPanel) {
       });
       verificationPanel.hidden = true;
       message(result.message || 'Email verified. You can now sign in.');
-      window.setTimeout(() => window.location.assign('./signin.html'), 1200);
+      window.setTimeout(() => window.location.assign(authPageUrl('signin')), 1200);
     } catch (error) {
       message(error.message || 'The verification code could not be confirmed.', true);
     } finally {
@@ -190,6 +217,12 @@ if (verificationPanel) {
 }
 
 async function init() {
+  if (page === 'signin' || page === 'signup') {
+    const otherPage = page === 'signin' ? 'signup' : 'signin';
+    document.querySelectorAll(`a[href="./${otherPage}.html"]`)
+      .forEach(link => { link.href = authPageUrl(otherPage); });
+  }
+
   if (page === 'reset-password') {
     const email = new URLSearchParams(window.location.search).get('email');
     if (email) form.elements.email.value = email;
@@ -198,7 +231,8 @@ async function init() {
   try {
     const { user } = await api('/auth/me');
     if ((page === 'signin' || page === 'signup') && user) {
-      redirectToDashboard(user);
+      if (page === 'signin') redirectAfterSignIn(user);
+      else redirectToDashboard(user);
     }
   } catch (error) {
     if (error.status !== 401) {
