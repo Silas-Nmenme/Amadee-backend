@@ -50,6 +50,11 @@ const productSchema = new mongoose.Schema(
       default: [],
     },
 
+    imagePublicIds: {
+      type: [String],
+      default: [],
+    },
+
     sizes: {
       type: [String],
       default: [],

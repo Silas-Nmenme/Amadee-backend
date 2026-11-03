@@ -58,3 +58,11 @@ ordinary `/api/auth/signup` registrations cannot create admin accounts.
 For local development, set `ADMIN_REGISTRATION_KEY` in `.env` and restart the
 API. For Vercel, add it to the project's Environment Variables and redeploy.
 Remove the key from the backend environment after successful registration.
+
+Product image uploads use Cloudinary. Configure `CLOUDINARY_CLOUD_NAME`,
+`CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the backend environment
+(never in frontend code), then redeploy/restart the API. Administrators can
+upload up to 10 JPG, PNG, WebP, or AVIF images per request (8 MB each); saved
+product records keep both each secure image URL and its Cloudinary public ID.
+Removed images are deleted from Cloudinary when an edited product is saved.
+Product deactivation remains a soft-delete and retains its images.

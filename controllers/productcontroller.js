@@ -1,4 +1,5 @@
 import Product from "../models/Product.js";
+import { deleteProductImages } from "../services/cloudinary.js";
 
 const escapeRegExp = (value) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -124,7 +125,10 @@ export const getAdminProducts = async (req, res, next) => {
  */
 export const createProduct = async (req, res, next) => {
   try {
-    const product = await Product.create(req.validatedBody);
+    const product = await Product.create({
+      ...req.validatedBody,
+      imagePublicIds: req.validatedBody.imagePublicIds || [],
+    });
 
     return res.status(201).json({
       message: "Product created successfully.",
@@ -147,9 +151,22 @@ export const createProduct = async (req, res, next) => {
  */
 export const updateProduct = async (req, res, next) => {
   try {
+    const existing = await Product.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({
+        message: "Product not found.",
+      });
+    }
+
+    const previousPublicIds = existing.imagePublicIds || [];
+    const update = { ...req.validatedBody };
+    if (Object.hasOwn(update, "images") && !Object.hasOwn(update, "imagePublicIds")) {
+      update.imagePublicIds = [];
+    }
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { $set: req.validatedBody },
+      { $set: update },
       {
         new: true,
         runValidators: true,
@@ -160,6 +177,19 @@ export const updateProduct = async (req, res, next) => {
       return res.status(404).json({
         message: "Product not found.",
       });
+    }
+
+    const retainedPublicIds = new Set(product.imagePublicIds || []);
+    const removedPublicIds = previousPublicIds.filter(id => !retainedPublicIds.has(id));
+    if (removedPublicIds.length) {
+      try {
+        await deleteProductImages(removedPublicIds);
+      } catch (error) {
+        console.error("Could not remove replaced product images from Cloudinary:", {
+          productCode: product.productCode,
+          message: error instanceof Error ? error.message : error,
+        });
+      }
     }
 
     return res.status(200).json({

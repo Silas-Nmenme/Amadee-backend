@@ -73,7 +73,9 @@
             <label>Low-stock alert at<input name="lowStockThreshold" type="number" min="0" step="1" value="5" required></label>
           </div>
           <label>Description<textarea name="description" maxlength="3000" required></textarea></label>
-          <label>Image URLs <span class="field-help">One valid URL per line.</span><textarea name="images" rows="3"></textarea></label>
+          <label>Upload product images <span class="field-help">JPG, PNG, WebP or AVIF · up to 10 files per upload · 8 MB each.</span><input name="imageFiles" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple></label>
+          <div id="product-image-previews" class="product-image-previews" aria-live="polite"></div>
+          <label>Image URLs <span class="field-help">Uploaded Cloudinary URLs appear here. You can also enter one HTTP or HTTPS image URL per line.</span><textarea name="images" rows="3"></textarea></label>
           <div class="admin-form-grid">
             <label>Sizes <span class="field-help">One value per line.</span><textarea name="sizes" rows="3"></textarea></label>
             <label>Colours <span class="field-help">One value per line.</span><textarea name="colours" rows="3"></textarea></label>

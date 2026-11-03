@@ -20,6 +20,7 @@ const orderStatuses = [
 ];
 let currentPage = 1;
 let totalPages = 1;
+let productImagePublicIds = new Map();
 
 initAuth();
 
@@ -135,9 +136,11 @@ function arrayField(value) {
 
 function resetProductForm() {
   productForm.reset();
+  productImagePublicIds = new Map();
   productField('id').value = '';
   productField('lowStockThreshold').value = '5';
   productField('active').checked = true;
+  renderProductImagePreviews();
   byId('product-form-title').textContent = 'Add a product';
   setStatus('product-form-status', '');
 }
@@ -152,6 +155,13 @@ function editProduct(product) {
   productField('lowStockThreshold').value = product.lowStockThreshold ?? 5;
   productField('description').value = product.description || '';
   productField('images').value = (product.images || []).join('\n');
+  productImagePublicIds = new Map(
+    (product.images || []).map((url, index) => [
+      url,
+      product.imagePublicIds?.[index] || '',
+    ])
+  );
+  renderProductImagePreviews();
   productField('sizes').value = (product.sizes || []).join('\n');
   productField('colours').value = (product.colours || []).join('\n');
   productField('featured').checked = Boolean(product.featured);
@@ -162,11 +172,99 @@ function editProduct(product) {
   productForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function currentProductImageUrls() {
+  return arrayField(productField('images').value);
+}
+
+function renderProductImagePreviews() {
+  const container = byId('product-image-previews');
+  if (!container) return;
+  const urls = currentProductImageUrls();
+  const currentUrls = new Set(urls);
+  for (const url of productImagePublicIds.keys()) {
+    if (!currentUrls.has(url)) productImagePublicIds.delete(url);
+  }
+  container.replaceChildren();
+
+  for (const [index, url] of urls.entries()) {
+    const preview = document.createElement('div');
+    preview.className = 'product-image-preview';
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = `Product image ${index + 1}`;
+    image.loading = 'lazy';
+    image.onerror = () => {
+      image.onerror = null;
+      image.alt = `Preview unavailable for product image ${index + 1}`;
+    };
+    const remove = safeText('button', 'Remove image', 'text-button');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove product image ${index + 1}`);
+    remove.onclick = () => {
+      productField('images').value = currentProductImageUrls()
+        .filter((_, urlIndex) => urlIndex !== index)
+        .join('\n');
+      renderProductImagePreviews();
+    };
+    preview.append(image, remove);
+    container.append(preview);
+  }
+}
+
+async function uploadProductImageFiles() {
+  const input = productField('imageFiles');
+  const files = [...input.files];
+  if (!files.length) return;
+  const existingUrls = currentProductImageUrls();
+  if (existingUrls.length + files.length > 20) {
+    setStatus('product-form-status', 'A product can have up to 20 images.');
+    input.value = '';
+    return;
+  }
+
+  input.disabled = true;
+  setStatus('product-form-status', `Uploading ${files.length} image${files.length === 1 ? '' : 's'} to Cloudinary…`);
+  try {
+    const body = new FormData();
+    files.forEach(file => body.append('images', file));
+    const { images } = await api('/admin/products/images', {
+      method: 'POST',
+      body,
+    });
+    const urls = [...existingUrls];
+    for (const image of images) {
+      if (!image?.url || !image?.publicId) {
+        throw new Error('Cloudinary returned incomplete image information.');
+      }
+      urls.push(image.url);
+      productImagePublicIds.set(image.url, image.publicId);
+    }
+    productField('images').value = urls.join('\n');
+    renderProductImagePreviews();
+    setStatus('product-form-status', `${images.length} image${images.length === 1 ? '' : 's'} uploaded. Save the product to keep these images.`);
+  } catch (error) {
+    setStatus('product-form-status', `Images could not be uploaded: ${error.message}`);
+  } finally {
+    input.value = '';
+    input.disabled = false;
+  }
+}
+
 function renderProduct(product) {
   const card = document.createElement('article');
   card.className = 'admin-record';
   const info = document.createElement('div');
   info.className = 'admin-record-details';
+  if (product.images?.[0]) {
+    const image = document.createElement('img');
+    image.src = product.images[0];
+    image.alt = '';
+    image.loading = 'lazy';
+    image.width = 72;
+    image.height = 72;
+    image.style.cssText = 'float:left;width:72px;height:72px;object-fit:cover;border-radius:8px;margin:0 12px 8px 0';
+    info.append(image);
+  }
   info.append(
     safeText('h3', `${product.name} · ${product.productCode}`),
     safeText('p', `${product.category} · ${formatNaira(product.price)} · Stock: ${product.stock} · Low-stock threshold: ${product.lowStockThreshold}`),
@@ -227,6 +325,8 @@ async function saveProduct(event) {
     stock: Number(productField('stock').value),
     lowStockThreshold: Number(productField('lowStockThreshold').value),
     images: arrayField(productField('images').value),
+    imagePublicIds: arrayField(productField('images').value)
+      .map(url => productImagePublicIds.get(url) || ''),
     sizes: arrayField(productField('sizes').value),
     colours: arrayField(productField('colours').value),
     featured: productField('featured').checked,
@@ -299,6 +399,8 @@ byId('cancel-product').onclick = () => {
 };
 byId('refresh-subscribers').onclick = loadSubscribers;
 productForm.addEventListener('submit', saveProduct);
+productField('images').addEventListener('input', renderProductImagePreviews);
+productField('imageFiles').addEventListener('change', uploadProductImageFiles);
 
 byId('admin-signout').onclick = async event => {
   const button = event.currentTarget;
