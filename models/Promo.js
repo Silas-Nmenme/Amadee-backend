@@ -10,6 +10,10 @@ const promoSchema = new mongoose.Schema(
     applicableProductCodes: { type: [String], default: [] },
     maxUses: { type: Number, default: null }, // null = unlimited
     uses: { type: Number, default: 0 },
+    redeemedBy: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
     expiresAt: { type: Date, default: null },
     active: { type: Boolean, default: true },
     publishAnnouncement: { type: Boolean, default: false },

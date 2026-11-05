@@ -45,7 +45,7 @@ export async function getActivePromotions(_req, res, next) {
 
 export async function validatePromo(req, res, next) {
   try {
-    const promo = await findUsablePromo(req.validatedBody.code);
+    const promo = await findUsablePromo(req.validatedBody.code, req.user?._id);
     const items = await getPricedItems(req.validatedBody.items);
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const quote = calculatePromoDiscount(promo, items, subtotal);
@@ -63,7 +63,11 @@ export async function validatePromo(req, res, next) {
 
 export async function getAdminPromos(_req, res, next) {
   try {
-    const promotions = await Promo.find().sort({ createdAt: -1 }).limit(500).lean();
+    const promotions = await Promo.find()
+      .select("-redeemedBy")
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
     return res.status(200).json({ promotions });
   } catch (error) {
     return next(error);

@@ -61,7 +61,9 @@ redemptions, set expiry and minimum-order conditions, restrict eligible product
 codes, and publish announcements. Campaign management is available at
 `/api/admin/promos`; customers can preview a code at `/api/promos/validate`,
 and authenticated order creation revalidates the code and reserves its usage
-limit using server-side catalogue prices. Active published announcements are
+limit using server-side catalogue prices. Each signed-in customer can redeem a
+campaign only once; repeat attempts return `this code as been used already by you.`.
+Active published announcements are
 available at `/api/promos/active` and appear on the home page, signed-in account
 dashboard, and cart.
 

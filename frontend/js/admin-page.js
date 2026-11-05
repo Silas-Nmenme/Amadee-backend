@@ -466,7 +466,7 @@ function renderPromo(promo) {
   info.append(
     safeText('h3', `${promo.name || promo.code} · ${promo.code}`),
     safeText('p', `${discount} · Minimum order ${formatNaira(promo.minSubtotal || 0)}${expiry}`),
-    safeText('p', `${usage} · ${promo.active ? 'Active' : 'Inactive'}${promo.publishAnnouncement ? ' · Announcement published' : ''}`),
+    safeText('p', `${usage} · One redemption per customer · ${promo.active ? 'Active' : 'Inactive'}${promo.publishAnnouncement ? ' · Announcement published' : ''}`),
   );
   const actions = document.createElement('div');
   actions.className = 'admin-record-actions';

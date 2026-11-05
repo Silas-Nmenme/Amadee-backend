@@ -11,7 +11,12 @@ import { Promo } from "../models/Promo.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
-import { calculatePromoDiscount, reservePromoUse } from "../services/promoService.js";
+import {
+  calculatePromoDiscount,
+  findUsablePromo,
+  PROMO_ALREADY_USED_MESSAGE,
+  reservePromoUse,
+} from "../services/promoService.js";
 import { promoAdminSchema } from "../validators/promoValidator.js";
 
 function responseRecorder() {
@@ -38,6 +43,7 @@ const activePromo = {
   minSubtotal: 5000,
   maxUses: 2,
   uses: 1,
+  redeemedBy: [],
   applicableProductCodes: ["AS-001"],
   active: true,
 };
@@ -94,12 +100,29 @@ test("promo validation prices products on the server and returns a campaign quot
 
   await validatePromo({
     validatedBody: { code: "STITCH10", items: [{ productId: "AS-001", quantity: 2 }] },
+    user: { _id: "507f1f77bcf86cd799439011" },
   }, res, error => { throw error; });
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.subtotal, 20000);
   assert.equal(res.body.discount, 2000);
   assert.equal(res.body.totalAfterDiscount, 18000);
+});
+
+test("repeat redemption is rejected with the requested message during code validation", async t => {
+  const userId = "507f1f77bcf86cd799439011";
+  t.mock.method(Promo, "findOne", () => ({
+    lean: async () => ({ ...activePromo, redeemedBy: [userId] }),
+  }));
+  let receivedError;
+  const res = responseRecorder();
+
+  await validatePromo({
+    validatedBody: { code: "STITCH10", items: [] },
+    user: { _id: userId },
+  }, res, error => { receivedError = error; });
+
+  assert.equal(receivedError.message, "this code as been used already by you.");
 });
 
 test("public announcements include only published active campaigns", async t => {
@@ -142,22 +165,41 @@ test("redemption reservation atomically checks the remaining use limit", async t
     return { uses: 2 };
   });
 
-  await reservePromoUse(activePromo);
+  const userId = "507f1f77bcf86cd799439011";
+  await reservePromoUse(activePromo, userId);
 
   assert.equal(filter._id, activePromo._id);
+  assert.deepEqual(filter.redeemedBy, { $ne: userId });
   assert.deepEqual(filter.$and[1], {
     $or: [{ maxUses: null }, { $expr: { $lt: ["$uses", "$maxUses"] } }],
   });
-  assert.deepEqual(update, { $inc: { uses: 1 } });
+  assert.deepEqual(update, {
+    $inc: { uses: 1 },
+    $addToSet: { redeemedBy: userId },
+  });
 });
 
-test("redemption fails explicitly when the final use is claimed concurrently", async t => {
+test("concurrent repeat redemption returns the requested message", async t => {
+  const userId = "507f1f77bcf86cd799439011";
   t.mock.method(Promo, "findOneAndUpdate", async () => null);
+  t.mock.method(Promo, "findById", () => ({
+    select() { return this; },
+    lean: async () => ({ redeemedBy: [userId] }),
+  }));
 
   await assert.rejects(
-    reservePromoUse(activePromo),
-    error => error.status === 400 && /no longer available/.test(error.message)
+    reservePromoUse(activePromo, userId),
+    error => error.status === 400 && error.message === PROMO_ALREADY_USED_MESSAGE
   );
+});
+
+test("unredeemed customers can still use campaign codes until the campaign limit is reached", async t => {
+  t.mock.method(Promo, "findOne", () => ({
+    lean: async () => ({ ...activePromo, redeemedBy: ["507f191e810c19729de860ea"] }),
+  }));
+
+  const promo = await findUsablePromo("stitch10", "507f1f77bcf86cd799439011");
+  assert.equal(promo.code, activePromo.code);
 });
 
 test("order creation recalculates and persists promo discount from backend prices", async t => {
@@ -172,7 +214,11 @@ test("order creation recalculates and persists promo discount from backend price
   };
   t.mock.method(Product, "find", () => ({ lean: async () => [product] }));
   t.mock.method(Promo, "findOne", () => ({ lean: async () => activePromo }));
-  t.mock.method(Promo, "findOneAndUpdate", async () => ({ uses: 2 }));
+  let reservationUpdate;
+  t.mock.method(Promo, "findOneAndUpdate", async (_query, update) => {
+    reservationUpdate = update;
+    return { uses: 2 };
+  });
   t.mock.method(Order, "create", async data => {
     savedOrder = data;
     return data;
@@ -204,4 +250,5 @@ test("order creation recalculates and persists promo discount from backend price
   assert.equal(savedOrder.total, 18000);
   assert.equal(savedOrder.promoCode, "STITCH10");
   assert.equal(savedOrder.promoCampaignName, activePromo.name);
+  assert.deepEqual(reservationUpdate.$addToSet.redeemedBy, "user-id");
 });

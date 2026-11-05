@@ -210,7 +210,7 @@ export async function createOrder(req, res, next) {
     let promo = null;
 
     if (promoCode) {
-      promo = await findUsablePromo(promoCode);
+      promo = await findUsablePromo(promoCode, req.user._id);
       discount = calculatePromoDiscount(promo, items, subtotal).discount;
     }
 
@@ -228,7 +228,7 @@ export async function createOrder(req, res, next) {
       email: req.user.email,
     };
 
-    if (promo) await reservePromoUse(promo);
+    if (promo) await reservePromoUse(promo, req.user._id);
 
     let order;
     try {
@@ -254,7 +254,7 @@ export async function createOrder(req, res, next) {
     } catch (error) {
       if (promo) {
         try {
-          await releasePromoUse(promo._id);
+          await releasePromoUse(promo._id, req.user._id);
         } catch (releaseError) {
           console.error("Could not release promo after order creation failed:", releaseError);
         }
