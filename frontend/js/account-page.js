@@ -2,6 +2,7 @@ import { api, safeText, formatNaira } from './modules/utils.js';
 import { clearLocalAccountData } from './modules/account-data.js';
 import { initAuth } from './modules/auth.js';
 import { initPromotionAnnouncements } from './modules/promotions.js';
+import { openModal } from './modules/modal.js';
 
 const status = document.getElementById('account-status');
 const profile = document.getElementById('profile-form');
@@ -9,6 +10,112 @@ const panel = document.getElementById('account-panel');
 const message = text => { status.textContent = text; };
 
 initAuth();
+
+function displayDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Date unavailable'
+    : date.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function safeImageUrl(value) {
+  try {
+    const url = new URL(value, window.location.href);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function openOrderDetails(order) {
+  openModal(`Order ${order.orderId || ''}`, modal => {
+    const itemList = document.createElement('div');
+    itemList.className = 'order-detail-items';
+
+    for (const item of order.items || []) {
+      const row = document.createElement('article');
+      row.className = 'order-detail-item';
+      const imageUrl = safeImageUrl(item.image);
+      if (imageUrl) {
+        const image = document.createElement('img');
+        image.src = imageUrl;
+        image.alt = item.name || 'Product image';
+        image.loading = 'lazy';
+        image.onerror = () => image.replaceWith(safeText('div', 'Image unavailable', 'order-image-placeholder'));
+        row.append(image);
+      } else {
+        row.append(safeText('div', 'Image unavailable', 'order-image-placeholder'));
+      }
+
+      const details = document.createElement('div');
+      details.append(
+        safeText('strong', item.name || item.productId || 'Product'),
+        safeText('p', `Product code: ${item.productId || '—'} · Quantity: ${item.quantity}`),
+        safeText('p', `Size: ${item.size || '—'} · Colour: ${item.colour || '—'}`),
+        safeText('p', `Unit price: ${formatNaira(item.unitPrice)} · Line total: ${formatNaira(item.lineTotal)}`),
+      );
+      row.append(details);
+      itemList.append(row);
+    }
+
+    modal.append(
+      safeText('p', `Placed: ${displayDate(order.createdAt)}`),
+      safeText('p', `Order status: ${String(order.orderStatus || 'received').replaceAll('_', ' ')} · Payment: ${String(order.paymentStatus || 'pending').replaceAll('_', ' ')} via ${String(order.paymentMethod || '—').replaceAll('_', ' ')}`),
+      safeText('p', `Delivery: ${String(order.deliveryOption || '—').replaceAll('_', ' ')}`),
+      safeText('h3', 'Items'),
+      itemList,
+    );
+    if (order.promoCode) {
+      modal.append(safeText('p', `Promo: ${order.promoCode}${order.promoCampaignName ? ` · ${order.promoCampaignName}` : ''}`));
+    }
+    if (order.statusHistory?.length) {
+      modal.append(safeText('h3', 'Status history'));
+      const history = document.createElement('ul');
+      for (const entry of order.statusHistory) {
+        history.append(safeText('li', `${displayDate(entry.at)} · ${String(entry.status || '').replaceAll('_', ' ')}${entry.note ? ` — ${entry.note}` : ''}`));
+      }
+      modal.append(history);
+    }
+    modal.append(
+      safeText('p', `Subtotal: ${formatNaira(order.subtotal)} · Discount: ${formatNaira(order.discount)} · Delivery: ${formatNaira(order.deliveryFee)}`),
+      safeText('strong', `Order total: ${formatNaira(order.total)}`),
+    );
+  });
+}
+
+function renderOrder(order) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'customer-order-card';
+  card.setAttribute('aria-label', `View details for order ${order.orderId || ''}`);
+  card.onclick = () => openOrderDetails(order);
+  const details = document.createElement('span');
+  details.className = 'customer-order-summary';
+  details.append(safeText('span', `Order ${order.orderId || ''}`, 'order-detail-trigger'));
+
+  const itemCount = (order.items || []).reduce((total, item) => total + Number(item.quantity || 0), 0);
+  details.append(
+    safeText('span', `${itemCount} item${itemCount === 1 ? '' : 's'} · ${formatNaira(order.total)}`),
+    safeText('span', `Payment: ${String(order.paymentStatus || 'pending').replaceAll('_', ' ')} · Order: ${String(order.orderStatus || 'received').replaceAll('_', ' ')}`),
+    safeText('time', displayDate(order.createdAt)),
+  );
+
+  const images = document.createElement('span');
+  images.className = 'order-image-strip';
+  for (const item of (order.items || []).slice(0, 4)) {
+    const imageUrl = safeImageUrl(item.image);
+    if (!imageUrl) continue;
+    const image = document.createElement('img');
+    image.src = imageUrl;
+    image.alt = item.name || 'Order item';
+    image.loading = 'lazy';
+    images.append(image);
+  }
+  if (images.childElementCount) details.append(images);
+
+  card.append(details);
+  return card;
+}
 
 async function loadOrders() {
   const list = document.getElementById('orders-list');
@@ -21,20 +128,7 @@ async function loadOrders() {
       list.append(safeText('p', 'You have no orders yet.'));
       return;
     }
-
-    for (const order of orders) {
-      const card = document.createElement('article');
-      card.className = 'review-card';
-      const itemNames = order.items
-        .map(item => `${item.name} × ${item.quantity}`)
-        .join(', ');
-      card.append(
-        safeText('h3', `Order ${order.orderId}`),
-        safeText('p', itemNames),
-        safeText('p', `Total: ${formatNaira(order.total)} · ${order.discount ? `Saved ${formatNaira(order.discount)}${order.promoCode ? ` with ${order.promoCode}` : ''} · ` : ''}${order.paymentStatus} · ${order.orderStatus}`)
-      );
-      list.append(card);
-    }
+    orders.forEach(order => list.append(renderOrder(order)));
   } catch (error) {
     list.textContent = error.message || 'Your orders could not be loaded.';
   }

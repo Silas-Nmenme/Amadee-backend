@@ -28,8 +28,13 @@ test("order creation and account preference routes require authentication", () =
   const createOrderRoute = ordersRouter.stack.find(
     layer => layer.route?.path === '/' && layer.route.methods.post
   );
+  const myOrdersRoute = ordersRouter.stack.find(
+    layer => layer.route?.path === '/mine' && layer.route.methods.get
+  );
   assert.ok(createOrderRoute);
   assert.ok(createOrderRoute.route.stack.some(layer => layer.name === 'requireAuth'));
+  assert.ok(myOrdersRoute);
+  assert.ok(myOrdersRoute.route.stack.some(layer => layer.name === 'requireAuth'));
 
   const authLayer = accountRouter.stack.find(layer => layer.name === 'requireAuth');
   assert.ok(authLayer);

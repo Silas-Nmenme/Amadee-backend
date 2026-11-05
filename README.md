@@ -38,9 +38,10 @@ content or credentials). Order, payment,
 contact, newsletter, review, and account-notice delivery failures are logged
 without undoing the related action.
 
-Signed-in customers can manage their profile and view order history at
-`frontend/account.html`. Orders submitted with a valid session are associated
-with that customer. Administrators can manage orders, inventory, catalogue
+Signed-in customers can manage their profile and view their complete, account-
+scoped order history with item images and order details at `frontend/account.html`.
+Orders submitted with a valid session are associated with that customer.
+Administrators can manage orders, inventory, catalogue
 products, promo campaigns, subscribers, and summary metrics at
 `frontend/admin.html`; the backend enforces administrator authorization on each
 management endpoint.

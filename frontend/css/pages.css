@@ -43,6 +43,26 @@
 .order-detail-item img, .order-image-placeholder { width: 76px; height: 88px; object-fit: cover; border-radius: 6px; background: var(--soft); }
 .order-image-placeholder { display: grid; place-items: center; padding: .35rem; color: var(--muted); font-size: .75rem; text-align: center; }
 .order-detail-item p { margin: .25rem 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.customer-order-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 1.15rem;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.customer-order-card:hover { border-color: #9bb9b5; box-shadow: var(--shadow); transform: translateY(-1px); }
+.customer-order-card:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.customer-order-summary { display: grid; min-width: 0; gap: .3rem; }
+.customer-order-summary > span:not(.order-image-strip), .customer-order-summary time { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+.customer-order-summary .order-detail-trigger { color: var(--teal-deep); font-size: 1.08rem; font-weight: 850; }
+.customer-order-summary .order-image-strip img { width: 58px; height: 58px; }
+.customer-order-summary .order-image-strip { margin-top: .35rem; }
 .admin-record-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
 .admin-record-actions .button { min-height: 40px; padding: .6rem .85rem; }
 .admin-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.5rem; }
@@ -64,6 +84,11 @@
 button:disabled { cursor: wait; opacity: .65; }
 [hidden] { display: none !important; }
 @media (max-width: 820px) { .support-layout { grid-template-columns: 1fr; } .page-nav { width: 100%; margin: 0; } }
+@media (max-width: 820px) {
+  .page-nav { justify-content: center; gap: .5rem .85rem; }
+  .admin-section-heading { align-items: flex-start; }
+  .admin-record { min-width: 0; }
+}
 @media (max-width: 700px) {
   .admin-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-record { flex-direction: column; }
@@ -73,4 +98,8 @@ button:disabled { cursor: wait; opacity: .65; }
   .admin-summary, .admin-form-grid { grid-template-columns: 1fr; }
   .admin-section-heading { align-items: start; flex-direction: column; }
   .admin-subscriber { flex-direction: column; gap: .15rem; }
+  .admin-pagination { flex-wrap: wrap; gap: .55rem; }
+  .customer-order-card { padding: .9rem; }
+  .order-detail-item { grid-template-columns: 60px minmax(0, 1fr); gap: .6rem; padding: .55rem; }
+  .order-detail-item img, .order-image-placeholder { width: 60px; height: 72px; }
 }

@@ -1,6 +1,6 @@
 import { Promo } from "../models/Promo.js";
 
-export const PROMO_ALREADY_USED_MESSAGE = "this code has been used already by you.";
+export const PROMO_ALREADY_USED_MESSAGE = "this code as been used already by you.";
 
 function promoError(message, status = 400) {
   return Object.assign(new Error(message), { status });

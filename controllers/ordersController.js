@@ -400,13 +400,31 @@ export async function getMyOrders(req, res, next) {
 
     const orders = await Order.find({ user: req.user._id })
       .select(
-        "orderId items promoCode subtotal discount deliveryFee total paymentMethod paymentStatus paymentReference orderStatus createdAt"
+        "orderId items promoCode promoCampaignName subtotal discount deliveryOption deliveryFee total paymentMethod paymentStatus paymentReference orderStatus statusHistory createdAt"
       )
       .sort({ createdAt: -1 })
-      .limit(50)
       .lean();
 
-    return res.status(200).json({ orders });
+    const productCodes = [
+      ...new Set(orders.flatMap(order => (order.items || []).map(item => item.productId))),
+    ];
+    const products = productCodes.length
+      ? await Product.find({ productCode: { $in: productCodes } })
+        .select("productCode images")
+        .lean()
+      : [];
+    const imageByProductCode = new Map(
+      products.map(product => [product.productCode, product.images?.[0] || ""])
+    );
+    const ordersWithImages = orders.map(order => ({
+      ...order,
+      items: (order.items || []).map(item => ({
+        ...item,
+        image: imageByProductCode.get(item.productId) || "",
+      })),
+    }));
+
+    return res.status(200).json({ orders: ordersWithImages });
   } catch (error) {
     return next(error);
   }
