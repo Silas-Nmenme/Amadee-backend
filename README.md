@@ -45,6 +45,23 @@ Administrators can manage orders, inventory, catalogue
 products, promo campaigns, subscribers, and summary metrics at
 `frontend/admin.html`; the backend enforces administrator authorization on each
 management endpoint.
+
+The order dashboard also supports shipment tracking and customer cancellation
+or return requests. Customers can request cancellation before dispatch and
+request a return after completion; the backend verifies ownership and order
+eligibility. Administrators can review requests, update carrier/tracking
+details, and notify customers by email. For paid orders, a refund can only be
+recorded after an administrator completes it with the payment provider or bank
+and supplies the completed refund reference; the dashboard does not initiate
+money transfers. Order tracking and request records are available in the
+customer's account-scoped order history.
+
+The lifecycle endpoints are `POST /api/orders/:orderId/requests` for an
+authenticated customer's request, `PATCH /api/orders/:orderId/tracking` for
+admin tracking updates, `PATCH /api/orders/:orderId/requests/:requestId` for
+admin approval or rejection, and
+`POST /api/orders/:orderId/requests/:requestId/refund` to record a completed
+manual refund. These admin endpoints require administrator authorization.
 To bootstrap the single administrator, configure a random
 `ADMIN_REGISTRATION_KEY` of at least 32 characters in the backend environment.
 Send `POST /api/auth/register-admin` with the same JSON body as normal signup:

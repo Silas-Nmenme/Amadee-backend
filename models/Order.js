@@ -96,6 +96,47 @@ const statusHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const orderRequestSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["cancellation", "return"],
+      required: true,
+    },
+    reason: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 500,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "refunded"],
+      default: "pending",
+      index: true,
+    },
+    reviewNote: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: "",
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { timestamps: false }
+);
+
 /* -------------------------------------------------------------------------- */
 /* ORDER MODEL                                                                */
 /* -------------------------------------------------------------------------- */
@@ -287,6 +328,26 @@ const orderSchema = new mongoose.Schema(
     statusHistory: {
       type: [statusHistorySchema],
       default: [],
+    },
+
+    tracking: {
+      carrier: { type: String, trim: true, maxlength: 100, default: "" },
+      trackingNumber: { type: String, trim: true, maxlength: 120, default: "" },
+      trackingUrl: { type: String, trim: true, maxlength: 500, default: "" },
+      note: { type: String, trim: true, maxlength: 500, default: "" },
+      updatedAt: { type: Date, default: null },
+    },
+
+    orderRequests: {
+      type: [orderRequestSchema],
+      default: [],
+    },
+
+    refundReference: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: "",
     },
   },
   {

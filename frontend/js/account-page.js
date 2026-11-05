@@ -2,7 +2,7 @@ import { api, safeText, formatNaira } from './modules/utils.js';
 import { clearLocalAccountData } from './modules/account-data.js';
 import { initAuth } from './modules/auth.js';
 import { initPromotionAnnouncements } from './modules/promotions.js';
-import { openModal } from './modules/modal.js';
+import { closeModal, openModal } from './modules/modal.js';
 
 const status = document.getElementById('account-status');
 const profile = document.getElementById('profile-form');
@@ -25,6 +25,55 @@ function safeImageUrl(value) {
   } catch {
     return '';
   }
+}
+
+function canRequestOrderAction(order, type) {
+  const pendingRequest = (order.orderRequests || []).some(request => request.status === 'pending');
+  if (pendingRequest) return false;
+  const alreadyApproved = (order.orderRequests || []).some(request =>
+    request.type === type && ['approved', 'refunded'].includes(request.status)
+  );
+  if (alreadyApproved) return false;
+  return type === 'cancellation'
+    ? ['received', 'confirmed', 'in_production', 'ready'].includes(order.orderStatus)
+    : order.orderStatus === 'completed';
+}
+
+function requestOrderAction(order, type) {
+  const label = type === 'return' ? 'return' : 'cancellation';
+  openModal(`Request order ${label}`, modal => {
+    modal.append(safeText('p', `Order ${order.orderId}. The shop will review your request and email you with an update.`));
+    const form = document.createElement('form');
+    const reasonLabel = safeText('label', 'Reason for your request');
+    const reason = document.createElement('textarea');
+    reason.name = 'reason';
+    reason.required = true;
+    reason.minLength = 3;
+    reason.maxLength = 500;
+    reason.rows = 4;
+    reasonLabel.append(reason);
+    const submit = safeText('button', `Send ${label} request`, 'button');
+    submit.type = 'submit';
+    form.append(reasonLabel, submit);
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (!form.reportValidity() || submit.disabled) return;
+      submit.disabled = true;
+      try {
+        const result = await api(`/orders/${encodeURIComponent(order.orderId)}/requests`, {
+          method: 'POST',
+          body: JSON.stringify({ type, reason: reason.value.trim() }),
+        });
+        closeModal();
+        message(result.message || 'Your request has been sent for review.');
+        await loadOrders();
+      } catch (error) {
+        message(error.message || 'Your request could not be sent.');
+        submit.disabled = false;
+      }
+    };
+    modal.append(form);
+  });
 }
 
 function openOrderDetails(order) {
@@ -76,6 +125,31 @@ function openOrderDetails(order) {
       }
       modal.append(history);
     }
+    if (order.tracking?.carrier || order.tracking?.trackingNumber || order.tracking?.note) {
+      modal.append(safeText('h3', 'Delivery tracking'));
+      if (order.tracking.carrier) modal.append(safeText('p', `Carrier: ${order.tracking.carrier}`));
+      if (order.tracking.trackingNumber) modal.append(safeText('p', `Tracking number: ${order.tracking.trackingNumber}`));
+      if (order.tracking.note) modal.append(safeText('p', order.tracking.note));
+      const trackingUrl = safeImageUrl(order.tracking.trackingUrl);
+      if (trackingUrl) {
+        const link = safeText('a', 'Track shipment');
+        link.href = trackingUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        modal.append(link);
+      }
+    }
+    if (order.orderRequests?.length) {
+      modal.append(safeText('h3', 'Cancellation and return requests'));
+      const requests = document.createElement('ul');
+      for (const request of order.orderRequests) {
+        requests.append(safeText(
+          'li',
+          `${String(request.type || 'order').replaceAll('_', ' ')} · ${request.status} · ${displayDate(request.requestedAt)}${request.reason ? ` — ${request.reason}` : ''}${request.reviewNote ? ` · Shop response: ${request.reviewNote}` : ''}${request.status === 'refunded' && order.refundReference ? ` · Refund reference: ${order.refundReference}` : ''}`,
+        ));
+      }
+      modal.append(requests);
+    }
     modal.append(
       safeText('p', `Subtotal: ${formatNaira(order.subtotal)} · Discount: ${formatNaira(order.discount)} · Delivery: ${formatNaira(order.deliveryFee)}`),
       safeText('strong', `Order total: ${formatNaira(order.total)}`),
@@ -84,14 +158,15 @@ function openOrderDetails(order) {
 }
 
 function renderOrder(order) {
-  const card = document.createElement('button');
-  card.type = 'button';
+  const card = document.createElement('article');
   card.className = 'customer-order-card';
-  card.setAttribute('aria-label', `View details for order ${order.orderId || ''}`);
-  card.onclick = () => openOrderDetails(order);
   const details = document.createElement('span');
   details.className = 'customer-order-summary';
-  details.append(safeText('span', `Order ${order.orderId || ''}`, 'order-detail-trigger'));
+  const openButton = safeText('button', `Order ${order.orderId || ''}`, 'order-detail-trigger');
+  openButton.type = 'button';
+  openButton.setAttribute('aria-label', `View details for order ${order.orderId || ''}`);
+  openButton.onclick = () => openOrderDetails(order);
+  details.append(openButton);
 
   const itemCount = (order.items || []).reduce((total, item) => total + Number(item.quantity || 0), 0);
   details.append(
@@ -113,7 +188,17 @@ function renderOrder(order) {
   }
   if (images.childElementCount) details.append(images);
 
+  const actions = document.createElement('div');
+  actions.className = 'customer-order-actions';
+  for (const [type, label] of [['cancellation', 'Request cancellation'], ['return', 'Request a return']]) {
+    if (!canRequestOrderAction(order, type)) continue;
+    const button = safeText('button', label, 'button button-outline');
+    button.type = 'button';
+    button.onclick = () => requestOrderAction(order, type);
+    actions.append(button);
+  }
   card.append(details);
+  if (actions.childElementCount) card.append(actions);
   return card;
 }
 

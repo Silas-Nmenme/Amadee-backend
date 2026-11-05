@@ -102,6 +102,22 @@ function safeImageUrl(value) {
   }
 }
 
+function addField(form, labelText, name, value = '', type = 'text') {
+  const label = safeText('label', labelText);
+  const field = type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+  field.name = name;
+  if (type !== 'textarea') field.type = type;
+  field.value = value || '';
+  label.append(field);
+  form.append(label);
+  return field;
+}
+
+function refreshOrderModal(order) {
+  openOrderDetails(order);
+  loadOrders();
+}
+
 function openOrderDetails(order) {
   openModal(`Order ${order.orderId || ''}`, modal => {
     const customer = order.customer || {};
@@ -135,6 +151,7 @@ function openOrderDetails(order) {
     modal.append(
       safeText('p', `${customer.name || 'Customer'} · ${customer.email || ''} · ${customer.phone || ''}`),
       safeText('p', `Order status: ${labelize(order.orderStatus)} · Payment: ${labelize(order.paymentStatus)} via ${labelize(order.paymentMethod)}`),
+      ...(order.refundReference ? [safeText('p', `Refund reference: ${order.refundReference}`)] : []),
       safeText('p', `Placed: ${displayDate(order.createdAt)} · Delivery: ${labelize(order.deliveryOption)} · ${customer.address || 'No address'}`),
       ...(order.promoCode ? [safeText('p', `Promo: ${order.promoCode}${order.promoCampaignName ? ` · ${order.promoCampaignName}` : ''}`)] : []),
       itemsHeading,
@@ -163,6 +180,117 @@ function openOrderDetails(order) {
       }
       modal.append(history);
     }
+
+    modal.append(safeText('h3', 'Shipment tracking'));
+    const trackingForm = document.createElement('form');
+    trackingForm.className = 'order-management-form';
+    const tracking = order.tracking || {};
+    addField(trackingForm, 'Carrier', 'carrier', tracking.carrier);
+    addField(trackingForm, 'Tracking number', 'trackingNumber', tracking.trackingNumber);
+    addField(trackingForm, 'Tracking URL (HTTPS or HTTP)', 'trackingUrl', tracking.trackingUrl, 'url');
+    addField(trackingForm, 'Customer-facing delivery note', 'note', tracking.note, 'textarea');
+    const saveTracking = safeText('button', 'Save tracking details', 'button');
+    saveTracking.type = 'submit';
+    trackingForm.append(saveTracking);
+    trackingForm.onsubmit = async event => {
+      event.preventDefault();
+      if (!trackingForm.reportValidity() || saveTracking.disabled) return;
+      saveTracking.disabled = true;
+      try {
+        const { order: updated } = await api(`/orders/${encodeURIComponent(order.orderId)}/tracking`, {
+          method: 'PATCH',
+          body: JSON.stringify(Object.fromEntries(new FormData(trackingForm))),
+        });
+        setStatus('orders-status', `Tracking for ${order.orderId} was saved and the customer notified.`);
+        refreshOrderModal(updated);
+      } catch (error) {
+        setStatus('orders-status', `Tracking could not be saved: ${error.message}`);
+        saveTracking.disabled = false;
+      }
+    };
+    modal.append(trackingForm);
+
+    if (order.orderRequests?.length) {
+      modal.append(safeText('h3', 'Customer cancellation and return requests'));
+      for (const request of order.orderRequests) {
+        const requestCard = document.createElement('article');
+        requestCard.className = 'order-request-card';
+        requestCard.append(
+          safeText('strong', `${labelize(request.type)} · ${labelize(request.status)}`),
+          safeText('p', `Submitted: ${displayDate(request.requestedAt)}`),
+          safeText('p', `Reason: ${request.reason}`),
+        );
+        if (request.reviewNote) requestCard.append(safeText('p', `Review note: ${request.reviewNote}`));
+        if (request.status === 'pending') {
+          const reviewForm = document.createElement('form');
+          reviewForm.className = 'order-management-form';
+          addField(reviewForm, 'Response to customer (optional)', 'reviewNote', '', 'textarea');
+          for (const decision of ['approved', 'rejected']) {
+            const button = safeText('button', decision === 'approved' ? 'Approve request' : 'Reject request', 'button button-outline');
+            button.type = 'button';
+            button.onclick = async () => {
+              if (button.disabled) return;
+              reviewForm.querySelectorAll('button').forEach(item => { item.disabled = true; });
+              try {
+                const { order: updated } = await api(`/orders/${encodeURIComponent(order.orderId)}/requests/${encodeURIComponent(request._id)}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({
+                    decision,
+                    reviewNote: reviewForm.elements.reviewNote.value.trim(),
+                  }),
+                });
+                setStatus('orders-status', `${labelize(request.type)} request ${decision}.`);
+                refreshOrderModal(updated);
+              } catch (error) {
+                setStatus('orders-status', `Request could not be reviewed: ${error.message}`);
+                reviewForm.querySelectorAll('button').forEach(item => { item.disabled = false; });
+              }
+            };
+            reviewForm.append(button);
+          }
+          requestCard.append(reviewForm);
+        }
+        if (request.status === 'approved' && order.paymentStatus === 'paid') {
+          const refundForm = document.createElement('form');
+          refundForm.className = 'order-management-form';
+          refundForm.append(safeText('p', 'Complete the full order refund through the payment provider or bank first. This dashboard only records a refund that has already been sent.'));
+          addField(refundForm, 'Completed refund reference', 'refundReference', '', 'text').required = true;
+          const confirmationLabel = safeText('label', 'I confirm the refund has already been completed', 'order-refund-confirmation');
+          const confirmation = document.createElement('input');
+          confirmation.type = 'checkbox';
+          confirmation.name = 'confirmRefunded';
+          confirmation.required = true;
+          confirmationLabel.append(confirmation);
+          refundForm.append(confirmationLabel);
+          const refundButton = safeText('button', 'Record completed refund', 'button button-outline');
+          refundButton.type = 'submit';
+          refundForm.append(refundButton);
+          refundForm.onsubmit = async event => {
+            event.preventDefault();
+            if (!refundForm.reportValidity() || refundButton.disabled) return;
+            refundButton.disabled = true;
+            try {
+              const { order: updated } = await api(`/orders/${encodeURIComponent(order.orderId)}/requests/${encodeURIComponent(request._id)}/refund`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  refundReference: refundForm.elements.refundReference.value.trim(),
+                  confirmRefunded: refundForm.elements.confirmRefunded.checked,
+                }),
+              });
+              setStatus('orders-status', `Refund for ${order.orderId} recorded.`);
+              refreshOrderModal(updated);
+              await loadSummary();
+            } catch (error) {
+              setStatus('orders-status', `Refund could not be recorded: ${error.message}`);
+              refundButton.disabled = false;
+            }
+          };
+          requestCard.append(refundForm);
+        }
+        modal.append(requestCard);
+      }
+    }
+
     modal.append(
       safeText('p', `Subtotal: ${formatNaira(order.subtotal)} · Discount: ${formatNaira(order.discount)} · Delivery: ${formatNaira(order.deliveryFee)}`),
       safeText('strong', `Order total: ${formatNaira(order.total)}`),

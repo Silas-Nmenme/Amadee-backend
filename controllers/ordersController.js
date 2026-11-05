@@ -7,8 +7,10 @@ import User from "../models/User.js";
 import { sendBestEffortMail } from "../services/mailer.js";
 import {
   adminNewOrderEmail,
+  orderRequestEmail,
   orderReceivedEmail,
   orderStatusEmail,
+  orderTrackingEmail,
 } from "../templates/emailTemplates.js";
 
 const deliveryFees = {
@@ -67,6 +69,15 @@ async function notifyCustomer(order) {
 
 async function notifyOrderParties(order) {
   await Promise.all([notifyCustomer(order), notifyOwner(order)]);
+}
+
+async function notifyOrderCustomer(order, event, template) {
+  if (!order.customer?.email) return;
+  await sendBestEffortMail({
+    event,
+    to: order.customer.email,
+    ...template,
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -400,7 +411,7 @@ export async function getMyOrders(req, res, next) {
 
     const orders = await Order.find({ user: req.user._id })
       .select(
-        "orderId items promoCode promoCampaignName subtotal discount deliveryOption deliveryFee total paymentMethod paymentStatus paymentReference orderStatus statusHistory createdAt"
+        "orderId items promoCode promoCampaignName subtotal discount deliveryOption deliveryFee total paymentMethod paymentStatus paymentReference orderStatus statusHistory tracking orderRequests refundReference createdAt"
       )
       .sort({ createdAt: -1 })
       .lean();
@@ -527,9 +538,7 @@ export async function updateOrderStatus(req, res, next) {
       });
 
       if (!existingOrder) {
-        return res.status(404).json({
-          message: "Order not found.",
-        });
+        return res.status(404).json({ message: "Order not found." });
       }
 
       return res.status(200).json({
@@ -542,10 +551,7 @@ export async function updateOrderStatus(req, res, next) {
       await sendBestEffortMail({
         event: "Order status update",
         to: order.customer.email,
-        ...orderStatusEmail({
-          order,
-          status: order.orderStatus,
-        }),
+        ...orderStatusEmail({ order, status: order.orderStatus }),
       });
     }
 
@@ -557,3 +563,257 @@ export async function updateOrderStatus(req, res, next) {
     return next(error);
   }
 }
+
+      /* -------------------------------------------------------------------------- */
+      /* CUSTOMER ORDER REQUEST                                                     */
+      /* POST /api/orders/:orderId/requests                                         */
+      /* -------------------------------------------------------------------------- */
+
+      export async function createOrderRequest(req, res, next) {
+        try {
+          const { type, reason } = req.validatedBody;
+          const eligibleStatuses = type === "cancellation"
+            ? ["received", "confirmed", "in_production", "ready"]
+            : ["completed"];
+          const now = new Date();
+          const order = await Order.findOneAndUpdate(
+            {
+              orderId: req.params.orderId,
+              user: req.user._id,
+              orderStatus: { $in: eligibleStatuses },
+              $nor: [
+                { orderRequests: { $elemMatch: { status: "pending" } } },
+                {
+                  orderRequests: {
+                    $elemMatch: {
+                      type,
+                      status: { $in: ["approved", "refunded"] },
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              $push: {
+                orderRequests: { type, reason, status: "pending", requestedAt: now },
+              },
+            },
+            { new: true, runValidators: true }
+          );
+
+          if (!order) {
+            const existing = await Order.findOne({
+              orderId: req.params.orderId,
+              user: req.user._id,
+            }).select("orderStatus orderRequests");
+            if (!existing) throw createHttpError("Order not found.", 404);
+            if (existing.orderRequests?.some(request => request.status === "pending")) {
+              throw createHttpError("A request is already awaiting review for this order.", 409);
+            }
+            if (existing.orderRequests?.some(request =>
+              request.type === type && ["approved", "refunded"].includes(request.status)
+            )) {
+              throw createHttpError(`A ${type} request has already been approved for this order.`, 409);
+            }
+            throw createHttpError(
+              type === "cancellation"
+                ? "This order can no longer be cancelled. Contact the shop for assistance."
+                : "A return request can only be made after an order is completed."
+            );
+          }
+
+          const request = order.orderRequests.at(-1);
+          await sendBestEffortMail({
+            event: "New order request notification",
+            to: process.env.SHOP_OWNER_EMAIL,
+            ...orderRequestEmail({ order, request, audience: "admin" }),
+          });
+          await sendBestEffortMail({
+            event: "Customer order request confirmation",
+            to: order.customer.email,
+            ...orderRequestEmail({ order, request, audience: "customer" }),
+          });
+
+          return res.status(201).json({
+            order,
+            request,
+            message: "Your request has been sent to the shop for review.",
+          });
+        } catch (error) {
+          return next(error);
+        }
+      }
+
+      /* -------------------------------------------------------------------------- */
+      /* ADMIN ORDER TRACKING                                                      */
+      /* PATCH /api/orders/:orderId/tracking                                        */
+      /* -------------------------------------------------------------------------- */
+
+      export async function updateOrderTracking(req, res, next) {
+        try {
+          const order = await Order.findOne({ orderId: req.params.orderId });
+          if (!order) throw createHttpError("Order not found.", 404);
+
+          const tracking = req.validatedBody;
+          const updatedAt = new Date();
+          const trackingChanged = Object.entries(tracking)
+            .some(([field, value]) => order.tracking?.[field] !== value);
+          if (!trackingChanged) {
+            return res.status(200).json({ order, message: "Tracking details are unchanged." });
+          }
+
+          order.tracking = { ...tracking, updatedAt };
+          const note = tracking.note || [
+            tracking.carrier && `Carrier: ${tracking.carrier}`,
+            tracking.trackingNumber && `Tracking number: ${tracking.trackingNumber}`,
+            tracking.trackingUrl && `Tracking link: ${tracking.trackingUrl}`,
+          ].filter(Boolean).join(" · ") || "Shipment tracking details updated.";
+          order.statusHistory.push({
+            status: order.orderStatus,
+            note,
+            at: updatedAt,
+          });
+          await order.save();
+
+          await notifyOrderCustomer(
+            order,
+            "Shipment tracking update",
+            orderTrackingEmail(order)
+          );
+
+          return res.status(200).json({
+            order,
+            message: "Tracking details updated and the customer was notified.",
+          });
+        } catch (error) {
+          return next(error);
+        }
+      }
+
+      /* -------------------------------------------------------------------------- */
+      /* ADMIN REVIEW OF CUSTOMER ORDER REQUEST                                     */
+      /* PATCH /api/orders/:orderId/requests/:requestId                             */
+      /* -------------------------------------------------------------------------- */
+
+      export async function reviewOrderRequest(req, res, next) {
+        try {
+          const order = await Order.findOne({ orderId: req.params.orderId });
+          if (!order) throw createHttpError("Order not found.", 404);
+
+          const request = order.orderRequests.id(req.params.requestId);
+          if (!request) throw createHttpError("Order request not found.", 404);
+          if (request.status !== "pending") {
+            throw createHttpError("This request has already been reviewed.", 409);
+          }
+
+          const { decision, reviewNote } = req.validatedBody;
+          const now = new Date();
+          const update = {
+            $set: {
+              "orderRequests.$.status": decision,
+              "orderRequests.$.reviewNote": reviewNote,
+              "orderRequests.$.reviewedAt": now,
+            },
+          };
+          if (decision === "approved" && request.type === "cancellation") {
+            update.$set.orderStatus = "cancelled";
+            update.$push = {
+              statusHistory: {
+                status: "cancelled",
+                note: reviewNote || "Customer cancellation request approved.",
+                at: now,
+              },
+            };
+          }
+          const updatedOrder = await Order.findOneAndUpdate(
+            {
+              orderId: req.params.orderId,
+              orderRequests: {
+                $elemMatch: { _id: request._id, status: "pending" },
+              },
+            },
+            update,
+            { new: true, runValidators: true }
+          );
+          if (!updatedOrder) {
+            throw createHttpError("This request has already been reviewed.", 409);
+          }
+          const updatedRequest = updatedOrder.orderRequests.id(request._id);
+
+          await sendBestEffortMail({
+            event: "Order request review notification",
+            to: updatedOrder.customer.email,
+            ...orderRequestEmail({ order: updatedOrder, request: updatedRequest, audience: "customer" }),
+          });
+
+          return res.status(200).json({
+            order: updatedOrder,
+            request: updatedRequest,
+            message: `Order ${updatedRequest.type} request ${decision}.`,
+          });
+        } catch (error) {
+          return next(error);
+        }
+      }
+
+      /* -------------------------------------------------------------------------- */
+      /* ADMIN CONFIRMATION OF MANUAL REFUND                                        */
+      /* POST /api/orders/:orderId/requests/:requestId/refund                       */
+      /* -------------------------------------------------------------------------- */
+
+      export async function confirmOrderRefund(req, res, next) {
+        try {
+          const { refundReference } = req.validatedBody;
+          const now = new Date();
+          const order = await Order.findOneAndUpdate(
+            {
+              orderId: req.params.orderId,
+              paymentStatus: "paid",
+              $and: [
+                { orderRequests: { $elemMatch: { _id: req.params.requestId, status: "approved" } } },
+                { $or: [{ refundReference: "" }, { refundReference: { $exists: false } }] },
+              ],
+            },
+            {
+              $set: {
+                paymentStatus: "refunded",
+                refundReference,
+                "orderRequests.$.status": "refunded",
+                "orderRequests.$.refundedAt": now,
+              },
+            },
+            { new: true, runValidators: true }
+          );
+          if (!order) {
+            const existing = await Order.findOne({ orderId: req.params.orderId });
+            if (!existing) throw createHttpError("Order not found.", 404);
+            if (existing.paymentStatus !== "paid") {
+              throw createHttpError("Only a paid order can be marked refunded.");
+            }
+            if (existing.refundReference) {
+              throw createHttpError("A refund has already been recorded for this order.", 409);
+            }
+            const request = existing.orderRequests.id(req.params.requestId);
+            if (!request) throw createHttpError("Order request not found.", 404);
+            if (request.status !== "approved") {
+              throw createHttpError("Approve the customer request before recording a refund.");
+            }
+            throw createHttpError("The refund could not be recorded.");
+          }
+
+          const request = order.orderRequests.id(req.params.requestId);
+
+          await sendBestEffortMail({
+            event: "Order refund notification",
+            to: order.customer.email,
+            ...orderRequestEmail({ order, request, audience: "customer" }),
+          });
+
+          return res.status(200).json({
+            order,
+            message: "Manual refund recorded. The customer has been notified.",
+          });
+        } catch (error) {
+          return next(error);
+        }
+      }

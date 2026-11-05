@@ -404,6 +404,78 @@ export function orderStatusEmail({ order, status }) {
   };
 }
 
+export function orderRequestEmail({ order, request, audience }) {
+  const isAdmin = audience === "admin";
+  const customerName = order.customer?.name || "Customer";
+  const type = request.type === "return" ? "return" : "cancellation";
+  const status = request.status || "pending";
+  const title = isAdmin
+    ? `Order ${type} request needs review`
+    : status === "pending"
+      ? `We received your ${type} request`
+      : status === "refunded"
+        ? "Your refund has been recorded"
+        : `Your ${type} request was ${status}`;
+  const details = [
+    ["Order reference", order.orderId || "Unknown"],
+    ["Request type", type],
+    ["Request status", status],
+    ["Reason", request.reason || "Not provided"],
+    ...(request.reviewNote ? [["Shop response", request.reviewNote]] : []),
+    ...(order.refundReference ? [["Refund reference", order.refundReference]] : []),
+  ];
+
+  return {
+    subject: `${title} | ${order.orderId || "Order"} | ${BRAND}`,
+    text: [
+      isAdmin ? "A customer submitted an order request." : `Hello ${customerName},`,
+      `Order: ${order.orderId || "Unknown"}`,
+      `Request: ${type} (${status})`,
+      `Reason: ${request.reason || "Not provided"}`,
+      ...(request.reviewNote ? [`Shop response: ${request.reviewNote}`] : []),
+      ...(order.refundReference ? [`Refund reference: ${order.refundReference}`] : []),
+    ].join("\n"),
+    html: emailLayout({
+      title,
+      preheader: `Order ${order.orderId || "Unknown"} · ${type} request · ${status}.`,
+      content: `${isAdmin ? `<p>${escapeHtml(customerName)} submitted a ${type} request.</p>` : `<p>Hello ${escapeHtml(customerName)},</p>`}
+        ${detailTable(details)}
+        ${isAdmin ? `<p>Review this request in the administrator dashboard.</p>` : ""}
+        ${button(isAdmin ? "Open admin dashboard" : "View your order")}`,
+    }),
+  };
+}
+
+export function orderTrackingEmail(order) {
+  const customerName = order.customer?.name || "Customer";
+  const tracking = order.tracking || {};
+  const details = [
+    ["Order reference", order.orderId || "Unknown"],
+    ["Carrier", tracking.carrier || "Not specified"],
+    ["Tracking number", tracking.trackingNumber || "Not specified"],
+    ["Order status", String(order.orderStatus || "").replaceAll("_", " ")],
+    ...(tracking.note ? [["Shop note", tracking.note]] : []),
+  ];
+
+  return {
+    subject: `Shipment tracking updated | ${order.orderId || "Order"} | ${BRAND}`,
+    text: [
+      `Hello ${customerName},`,
+      `Shipment tracking details for order ${order.orderId || "Unknown"} were updated.`,
+      ...details.map(([label, value]) => `${label}: ${value}`),
+      ...(tracking.trackingUrl ? [`Tracking link: ${tracking.trackingUrl}`] : []),
+    ].join("\n"),
+    html: emailLayout({
+      title: "Shipment tracking updated",
+      preheader: `New delivery information for order ${order.orderId || "Unknown"}.`,
+      content: `<p>Hello ${escapeHtml(customerName)},</p>
+        <p>There is new delivery information for your order.</p>
+        ${detailTable(details)}
+        ${tracking.trackingUrl ? button("Track your order", tracking.trackingUrl) : ""}`,
+    }),
+  };
+}
+
 export function contactNotificationEmail({ name, email, message, messageId }) {
   return {
     subject: `New customer enquiry | ${BRAND}`,

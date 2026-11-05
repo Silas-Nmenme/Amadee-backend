@@ -60,3 +60,35 @@ export const orderStatusSchema = z.object({
     "cancelled",
   ]),
 });
+
+export const orderRequestSchema = z.object({
+  type: z.enum(["cancellation", "return"]),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const reviewOrderRequestSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  reviewNote: z.string().trim().max(500).optional().default(""),
+});
+
+export const trackingSchema = z.object({
+  carrier: z.string().trim().max(100).optional().default(""),
+  trackingNumber: z.string().trim().max(120).optional().default(""),
+  trackingUrl: z.union([z.literal(""), z.string().url().max(500)]).optional().default(""),
+  note: z.string().trim().max(500).optional().default(""),
+}).superRefine((tracking, context) => {
+  if (tracking.trackingUrl) {
+    try {
+      if (!["http:", "https:"].includes(new URL(tracking.trackingUrl).protocol)) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["trackingUrl"], message: "Tracking URL must use HTTP or HTTPS." });
+      }
+    } catch {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["trackingUrl"], message: "Enter a valid tracking URL." });
+    }
+  }
+});
+
+export const refundSchema = z.object({
+  refundReference: z.string().trim().min(2).max(200),
+  confirmRefunded: z.literal(true),
+});

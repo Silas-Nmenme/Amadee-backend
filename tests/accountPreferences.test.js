@@ -36,6 +36,25 @@ test("order creation and account preference routes require authentication", () =
   assert.ok(myOrdersRoute);
   assert.ok(myOrdersRoute.route.stack.some(layer => layer.name === 'requireAuth'));
 
+  const customerRequestRoute = ordersRouter.stack.find(
+    layer => layer.route?.path === '/:orderId/requests' && layer.route.methods.post
+  );
+  assert.ok(customerRequestRoute);
+  assert.ok(customerRequestRoute.route.stack.some(layer => layer.name === 'requireAuth'));
+
+  for (const [path, method] of [
+    ['/:orderId/tracking', 'patch'],
+    ['/:orderId/requests/:requestId', 'patch'],
+    ['/:orderId/requests/:requestId/refund', 'post'],
+  ]) {
+    const adminRoute = ordersRouter.stack.find(
+      layer => layer.route?.path === path && layer.route.methods[method]
+    );
+    assert.ok(adminRoute, `Expected admin route ${method.toUpperCase()} ${path}`);
+    assert.ok(adminRoute.route.stack.some(layer => layer.name === 'requireAuth'));
+    assert.ok(adminRoute.route.stack.some(layer => layer.name === 'requireAdmin'));
+  }
+
   const authLayer = accountRouter.stack.find(layer => layer.name === 'requireAuth');
   assert.ok(authLayer);
   assert.ok(accountRouter.stack.some(layer => layer.route?.path === '/preferences'));

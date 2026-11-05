@@ -9,8 +9,10 @@ import {
   contactNotificationEmail,
   newsletterNotificationEmail,
   newsletterWelcomeEmail,
+  orderRequestEmail,
   orderReceivedEmail,
   orderStatusEmail,
+  orderTrackingEmail,
   passwordChangedEmail,
   passwordResetEmail,
   paymentConfirmedEmail,
@@ -67,6 +69,15 @@ const templates = [
   ["payment confirmed", () => paymentConfirmedEmail(order)],
   ["admin payment confirmed", () => adminPaymentConfirmedEmail(order)],
   ["order status", () => orderStatusEmail({ order, status: "ready" })],
+  ["order request", () => orderRequestEmail({
+    order,
+    request: { type: "return", status: "pending", reason: "<Damaged item>" },
+    audience: "customer",
+  })],
+  ["order tracking", () => orderTrackingEmail({
+    ...order,
+    tracking: { carrier: "Courier", trackingNumber: "TRACK-123", trackingUrl: "https://carrier.example/track/1" },
+  })],
   ["contact enquiry", () => contactNotificationEmail({
     name: user.name,
     email: user.email,

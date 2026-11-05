@@ -5,11 +5,19 @@ import {
   getMyOrders,
   getAdminOrders,
   updateOrderStatus,
+  createOrderRequest,
+  updateOrderTracking,
+  reviewOrderRequest,
+  confirmOrderRefund,
 } from "../controllers/ordersController.js";
 
 import {
   orderSchema,
   orderStatusSchema,
+  orderRequestSchema,
+  reviewOrderRequestSchema,
+  trackingSchema,
+  refundSchema,
 } from "../validators/orderValidator.js";
 
 import { validate } from "../middleware/validate.js";
@@ -41,6 +49,15 @@ router.get(
   getMyOrders
 );
 
+// Submit a cancellation or return request for an owned order.
+router.post(
+  "/:orderId/requests",
+  formLimiter,
+  requireAuth,
+  validate(orderRequestSchema),
+  createOrderRequest
+);
+
 /* -------------------------------------------------------------------------- */
 /* ADMIN ROUTES                                                               */
 /* -------------------------------------------------------------------------- */
@@ -60,6 +77,33 @@ router.patch(
   requireAdmin,
   validate(orderStatusSchema),
   updateOrderStatus
+);
+
+// Update shipment tracking details.
+router.patch(
+  "/:orderId/tracking",
+  requireAuth,
+  requireAdmin,
+  validate(trackingSchema),
+  updateOrderTracking
+);
+
+// Approve or reject a customer cancellation/return request.
+router.patch(
+  "/:orderId/requests/:requestId",
+  requireAuth,
+  requireAdmin,
+  validate(reviewOrderRequestSchema),
+  reviewOrderRequest
+);
+
+// Record a refund only after it has been completed manually with the provider.
+router.post(
+  "/:orderId/requests/:requestId/refund",
+  requireAuth,
+  requireAdmin,
+  validate(refundSchema),
+  confirmOrderRefund
 );
 
 export default router;

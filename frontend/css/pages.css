@@ -43,6 +43,13 @@
 .order-detail-item img, .order-image-placeholder { width: 76px; height: 88px; object-fit: cover; border-radius: 6px; background: var(--soft); }
 .order-image-placeholder { display: grid; place-items: center; padding: .35rem; color: var(--muted); font-size: .75rem; text-align: center; }
 .order-detail-item p { margin: .25rem 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.order-management-form { display: grid; gap: .75rem; margin-top: .8rem; }
+.order-management-form label { display: grid; gap: .35rem; min-width: 0; color: var(--teal-deep); font-weight: 700; }
+.order-management-form input, .order-management-form textarea { width: 100%; }
+.order-management-form .order-refund-confirmation { display: flex; align-items: flex-start; gap: .6rem; }
+.order-management-form input[type="checkbox"] { width: 1.1rem; min-height: 1.1rem; margin-top: .2rem; }
+.order-request-card { margin: .75rem 0; padding: 1rem; background: var(--soft); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.order-request-card p { margin: .45rem 0; color: var(--muted); overflow-wrap: anywhere; }
 .customer-order-card {
   display: block;
   width: 100%;
@@ -57,12 +64,14 @@
   transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 .customer-order-card:hover { border-color: #9bb9b5; box-shadow: var(--shadow); transform: translateY(-1px); }
-.customer-order-card:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.customer-order-card:focus-within { outline: 3px solid var(--gold); outline-offset: 3px; }
 .customer-order-summary { display: grid; min-width: 0; gap: .3rem; }
 .customer-order-summary > span:not(.order-image-strip), .customer-order-summary time { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
 .customer-order-summary .order-detail-trigger { color: var(--teal-deep); font-size: 1.08rem; font-weight: 850; }
 .customer-order-summary .order-image-strip img { width: 58px; height: 58px; }
 .customer-order-summary .order-image-strip { margin-top: .35rem; }
+.customer-order-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .9rem; }
+.customer-order-actions .button { min-height: 40px; }
 .admin-record-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
 .admin-record-actions .button { min-height: 40px; padding: .6rem .85rem; }
 .admin-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.5rem; }
