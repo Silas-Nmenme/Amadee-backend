@@ -10,6 +10,9 @@ const productsList = byId('admin-products');
 const subscribersList = byId('admin-subscribers');
 const productForm = byId('product-form');
 const productField = name => productForm.elements.namedItem(name);
+const promoForm = byId('promo-form');
+const promoField = name => promoForm.elements.namedItem(name);
+const promosList = byId('admin-promos');
 const orderStatuses = [
   'received',
   'confirmed',
@@ -38,6 +41,31 @@ function displayDate(value) {
   return Number.isNaN(date.getTime())
     ? 'Date unavailable'
     : date.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function localDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function promoPayload(promo) {
+  return {
+    code: String(promo.code || '').trim().toUpperCase(),
+    name: String(promo.name || promo.code || '').trim(),
+    type: promo.type,
+    value: Number(promo.value),
+    minSubtotal: Number(promo.minSubtotal || 0),
+    applicableProductCodes: Array.isArray(promo.applicableProductCodes)
+      ? promo.applicableProductCodes
+      : arrayField(promo.applicableProductCodes || ''),
+    maxUses: promo.maxUses === '' || promo.maxUses == null ? null : Number(promo.maxUses),
+    expiresAt: promo.expiresAt ? new Date(promo.expiresAt).toISOString() : null,
+    active: Boolean(promo.active),
+    publishAnnouncement: Boolean(promo.publishAnnouncement),
+    announcementText: String(promo.announcementText || '').trim(),
+  };
 }
 
 function summaryCard(label, value) {
@@ -108,6 +136,7 @@ function openOrderDetails(order) {
       safeText('p', `${customer.name || 'Customer'} · ${customer.email || ''} · ${customer.phone || ''}`),
       safeText('p', `Order status: ${labelize(order.orderStatus)} · Payment: ${labelize(order.paymentStatus)} via ${labelize(order.paymentMethod)}`),
       safeText('p', `Placed: ${displayDate(order.createdAt)} · Delivery: ${labelize(order.deliveryOption)} · ${customer.address || 'No address'}`),
+      ...(order.promoCode ? [safeText('p', `Promo: ${order.promoCode}${order.promoCampaignName ? ` · ${order.promoCampaignName}` : ''}`)] : []),
       itemsHeading,
       items,
     );
@@ -398,6 +427,123 @@ async function loadProducts() {
   }
 }
 
+function resetPromoForm() {
+  promoForm.reset();
+  promoField('id').value = '';
+  promoField('minSubtotal').value = '0';
+  promoField('active').checked = true;
+  byId('promo-form-title').textContent = 'Create a campaign';
+  setStatus('promo-form-status', '');
+}
+
+function editPromo(promo) {
+  promoField('id').value = promo._id;
+  promoField('name').value = promo.name || promo.code || '';
+  promoField('code').value = promo.code || '';
+  promoField('type').value = promo.type || 'percent';
+  promoField('value').value = promo.value ?? 1;
+  promoField('minSubtotal').value = promo.minSubtotal ?? 0;
+  promoField('maxUses').value = promo.maxUses ?? '';
+  promoField('expiresAt').value = localDateTime(promo.expiresAt);
+  promoField('applicableProductCodes').value = (promo.applicableProductCodes || []).join('\n');
+  promoField('announcementText').value = promo.announcementText || '';
+  promoField('publishAnnouncement').checked = Boolean(promo.publishAnnouncement);
+  promoField('active').checked = promo.active !== false;
+  byId('promo-form-title').textContent = `Edit ${promo.code}`;
+  setStatus('promo-form-status', '');
+  promoForm.hidden = false;
+  promoForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPromo(promo) {
+  const card = document.createElement('article');
+  card.className = 'admin-record';
+  const info = document.createElement('div');
+  info.className = 'admin-record-details';
+  const discount = promo.type === 'percent' ? `${promo.value}% off` : `${formatNaira(promo.value)} off`;
+  const expiry = promo.expiresAt ? ` · Expires ${displayDate(promo.expiresAt)}` : '';
+  const usage = promo.maxUses == null ? `${promo.uses || 0} redemptions · unlimited` : `${promo.uses || 0} / ${promo.maxUses} redemptions`;
+  info.append(
+    safeText('h3', `${promo.name || promo.code} · ${promo.code}`),
+    safeText('p', `${discount} · Minimum order ${formatNaira(promo.minSubtotal || 0)}${expiry}`),
+    safeText('p', `${usage} · ${promo.active ? 'Active' : 'Inactive'}${promo.publishAnnouncement ? ' · Announcement published' : ''}`),
+  );
+  const actions = document.createElement('div');
+  actions.className = 'admin-record-actions';
+  const edit = safeText('button', 'Edit', 'button button-outline');
+  edit.type = 'button';
+  edit.onclick = () => editPromo(promo);
+  const toggle = safeText('button', promo.active ? 'Deactivate' : 'Activate', 'button button-outline');
+  toggle.type = 'button';
+  toggle.onclick = async () => {
+    toggle.disabled = true;
+    try {
+      await api(`/admin/promos/${encodeURIComponent(promo._id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(promoPayload({ ...promo, active: !promo.active })),
+      });
+      setStatus('promos-status', `${promo.code} ${promo.active ? 'deactivated' : 'activated'}.`);
+      await loadPromos();
+    } catch (error) {
+      setStatus('promos-status', `Campaign could not be updated: ${error.message}`);
+      toggle.disabled = false;
+    }
+  };
+  actions.append(edit, toggle);
+  card.append(info, actions);
+  return card;
+}
+
+async function loadPromos() {
+  setStatus('promos-status', 'Loading promo campaigns…');
+  try {
+    const { promotions } = await api('/admin/promos');
+    promosList.replaceChildren();
+    if (!promotions.length) promosList.append(safeText('p', 'No campaigns have been created yet.'));
+    else promotions.forEach(promo => promosList.append(renderPromo(promo)));
+    setStatus('promos-status', `${promotions.length} campaign${promotions.length === 1 ? '' : 's'}.`);
+  } catch (error) {
+    setStatus('promos-status', `Campaigns could not be loaded: ${error.message}`);
+  }
+}
+
+async function savePromo(event) {
+  event.preventDefault();
+  if (!promoForm.reportValidity()) return;
+  const submit = promoForm.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  setStatus('promo-form-status', 'Saving campaign…');
+  try {
+    const id = promoField('id').value;
+    const payload = promoPayload({
+      code: promoField('code').value,
+      name: promoField('name').value,
+      type: promoField('type').value,
+      value: promoField('value').value,
+      minSubtotal: promoField('minSubtotal').value,
+      maxUses: promoField('maxUses').value,
+      expiresAt: promoField('expiresAt').value,
+      applicableProductCodes: promoField('applicableProductCodes').value,
+      announcementText: promoField('announcementText').value,
+      publishAnnouncement: promoField('publishAnnouncement').checked,
+      active: promoField('active').checked,
+    });
+    const response = await api(id ? `/admin/promos/${encodeURIComponent(id)}` : '/admin/promos', {
+      method: id ? 'PATCH' : 'POST',
+      body: JSON.stringify(payload),
+    });
+    setStatus('promos-status', response.message || 'Campaign saved.');
+    promoForm.hidden = true;
+    resetPromoForm();
+    await loadPromos();
+  } catch (error) {
+    setStatus('promo-form-status', `Campaign could not be saved: ${error.message}`);
+  } finally {
+    submit.disabled = false;
+  }
+}
+
 async function saveProduct(event) {
   event.preventDefault();
   if (!productForm.reportValidity()) return;
@@ -482,12 +628,22 @@ byId('new-product').onclick = () => {
   productForm.hidden = false;
   productForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
+byId('new-promo').onclick = () => {
+  resetPromoForm();
+  promoForm.hidden = false;
+  promoForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+byId('cancel-promo').onclick = () => {
+  promoForm.hidden = true;
+  resetPromoForm();
+};
 byId('cancel-product').onclick = () => {
   productForm.hidden = true;
   resetProductForm();
 };
 byId('refresh-subscribers').onclick = loadSubscribers;
 productForm.addEventListener('submit', saveProduct);
+promoForm.addEventListener('submit', savePromo);
 productField('images').addEventListener('input', renderProductImagePreviews);
 productField('imageFiles').addEventListener('change', uploadProductImageFiles);
 
@@ -513,7 +669,7 @@ async function start() {
     }
     adminStatus.textContent = `Signed in as ${user.name} · ${user.email}`;
     dashboard.hidden = false;
-    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadSubscribers()]);
+    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadPromos(), loadSubscribers()]);
   } catch (error) {
     if (error.status === 401) {
       adminStatus.textContent = 'Sign in with an administrator account to continue.';

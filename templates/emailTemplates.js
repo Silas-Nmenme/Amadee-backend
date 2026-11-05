@@ -124,6 +124,7 @@ function orderItemRows(order) {
 function orderSummary(order) {
   const rows = [
     ["Subtotal", formatNaira(order.subtotal)],
+    ...(order.promoCode ? [["Promo code", `${order.promoCode}${order.promoCampaignName ? ` (${order.promoCampaignName})` : ""}`]] : []),
     ["Discount", formatNaira(order.discount)],
     ["Delivery", formatNaira(order.deliveryFee)],
     ["Total", formatNaira(order.total)],
@@ -144,6 +145,7 @@ function plainOrderSummary(order) {
   return [
     ...items,
     `Subtotal: ${formatNaira(order.subtotal)}`,
+    ...(order.promoCode ? [`Promo code: ${order.promoCode}${order.promoCampaignName ? ` (${order.promoCampaignName})` : ""}`] : []),
     `Discount: ${formatNaira(order.discount)}`,
     `Delivery: ${formatNaira(order.deliveryFee)}`,
     `Total: ${formatNaira(order.total)}`,

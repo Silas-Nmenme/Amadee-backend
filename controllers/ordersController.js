@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import { calculatePromoDiscount, findUsablePromo, releasePromoUse, reservePromoUse } from "../services/promoService.js";
 import User from "../models/User.js";
 import { sendBestEffortMail } from "../services/mailer.js";
 import {
@@ -15,9 +16,6 @@ const deliveryFees = {
   lagos: 2000,
   outside: 5000,
 };
-
-// Promo codes intentionally remain disabled until real codes are configured.
-const promoCodes = {};
 
 function createHttpError(message, status = 400) {
   return Object.assign(new Error(message), { status });
@@ -208,22 +206,12 @@ export async function createOrder(req, res, next) {
     });
 
     const promoCode = body.promoCode.toUpperCase();
-
     let discount = 0;
+    let promo = null;
 
     if (promoCode) {
-      const promo = promoCodes[promoCode];
-
-      if (!promo) {
-        throw createHttpError(
-          "This promo code is not currently valid."
-        );
-      }
-
-      discount =
-        promo.type === "percent"
-          ? Math.round((subtotal * promo.value) / 100)
-          : Math.min(subtotal, promo.value);
+      promo = await findUsablePromo(promoCode);
+      discount = calculatePromoDiscount(promo, items, subtotal).discount;
     }
 
     const deliveryFee = deliveryFees[body.deliveryOption];
@@ -240,24 +228,39 @@ export async function createOrder(req, res, next) {
       email: req.user.email,
     };
 
-    // Save the order before initializing Paystack so the transaction
-    // reference can be associated with a persistent order.
-    const order = await Order.create({
-      orderId,
-      user: req.user._id,
-      customer,
-      items,
-      deliveryOption: body.deliveryOption,
-      measurements,
-      promoCode: "",
-      subtotal,
-      discount,
-      deliveryFee,
-      total,
-      paymentMethod: body.paymentMethod,
-      paymentStatus: "pending",
-      orderStatus: "received",
-    });
+    if (promo) await reservePromoUse(promo);
+
+    let order;
+    try {
+      // Save the order before initializing Paystack so the transaction
+      // reference can be associated with a persistent order.
+      order = await Order.create({
+        orderId,
+        user: req.user._id,
+        customer,
+        items,
+        deliveryOption: body.deliveryOption,
+        measurements,
+        promoCode,
+        promoCampaignName: promo?.name || promo?.code || "",
+        subtotal,
+        discount,
+        deliveryFee,
+        total,
+        paymentMethod: body.paymentMethod,
+        paymentStatus: "pending",
+        orderStatus: "received",
+      });
+    } catch (error) {
+      if (promo) {
+        try {
+          await releasePromoUse(promo._id);
+        } catch (releaseError) {
+          console.error("Could not release promo after order creation failed:", releaseError);
+        }
+      }
+      throw error;
+    }
 
     // Initialize Paystack for online payments.
     if (body.paymentMethod === "paystack") {
@@ -397,7 +400,7 @@ export async function getMyOrders(req, res, next) {
 
     const orders = await Order.find({ user: req.user._id })
       .select(
-        "orderId items subtotal discount deliveryFee total paymentMethod paymentStatus paymentReference orderStatus createdAt"
+        "orderId items promoCode subtotal discount deliveryFee total paymentMethod paymentStatus paymentReference orderStatus createdAt"
       )
       .sort({ createdAt: -1 })
       .limit(50)

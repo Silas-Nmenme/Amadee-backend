@@ -5,9 +5,12 @@ import { isApiCatalogueLoaded, loadProductsCatalogue } from './modules/products.
 import { setShopWhatsappNumber } from './config.js';
 import { getCurrentUser } from './modules/account-data.js';
 import { initAuth } from './modules/auth.js';
+import { initPromotionAnnouncements } from './modules/promotions.js';
 const delivery = { pickup: { fee: 0, label: 'Pick-up', time: 'Arrange a collection time with our team.' }, lagos: { fee: 2000, label: 'Within Lagos', time: 'Estimated 2–5 business days after production.' }, outside: { fee: 5000, label: 'Outside Lagos', time: 'Estimated 4–8 business days after production.' } };
 let busy = false;
 let checkoutAddressInput = null;
+let appliedPromo = null;
+let appliedPromoFingerprint = '';
 byId('year').textContent = new Date().getFullYear();
 function button(text, label, action) {
   const b = safeText('button', text); b.type = 'button'; b.setAttribute('aria-label', label);
@@ -30,13 +33,22 @@ async function perform(action) {
 }
 function renderSummary() {
   const option = delivery[byId('delivery').value];
+  const discount = appliedPromo?.discount || 0;
   byId('subtotal').textContent = formatNaira(getSubtotal());
+  byId('discount-line').hidden = !appliedPromo;
+  byId('discount').textContent = `−${formatNaira(discount)}`;
   byId('delivery-fee').textContent = option.fee ? formatNaira(option.fee) : 'Free';
-  byId('total').textContent = formatNaira(getSubtotal() + option.fee);
+  byId('total').textContent = formatNaira(Math.max(0, getSubtotal() - discount) + option.fee);
   byId('delivery-time').textContent = option.time;
 }
 function render() {
   const items = getCart();
+  const fingerprint = cartFingerprint();
+  if (appliedPromo && fingerprint !== appliedPromoFingerprint) {
+    appliedPromo = null;
+    appliedPromoFingerprint = '';
+    byId('promo-status').textContent = 'Your cart changed. Apply the promo code again.';
+  }
   byId('cart-content').hidden = !items.length;
   byId('empty-cart').hidden = !!items.length;
   const list = byId('cart-items'); list.replaceChildren();
@@ -73,6 +85,44 @@ function render() {
   byId('items-title').tabIndex = -1;
   byId('clear-cart').disabled = busy; byId('delivery').disabled = busy; byId('checkout').disabled = busy;
   renderSummary();
+}
+function cartFingerprint() {
+  return JSON.stringify(getCart().map(item => [item.id, item.quantity]).sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+async function applyPromo(event) {
+  event.preventDefault();
+  const codeInput = byId('promo-code');
+  const code = codeInput.value.trim().toUpperCase();
+  if (!code || busy) return;
+  const requestedFingerprint = cartFingerprint();
+  const submit = byId('apply-promo');
+  submit.disabled = true;
+  byId('promo-status').textContent = 'Checking promo code…';
+  try {
+    const { code: validCode, name, discount } = await api('/promos/validate', {
+      method: 'POST',
+      body: JSON.stringify({
+        code,
+        items: getCart().map(item => ({ productId: item.id, quantity: item.quantity })),
+      }),
+    });
+    if (cartFingerprint() !== requestedFingerprint) {
+      throw new Error('Your cart changed while the code was being checked. Please apply it again.');
+    }
+    appliedPromo = { code: validCode, name, discount };
+    appliedPromoFingerprint = requestedFingerprint;
+    codeInput.value = validCode;
+    byId('promo-status').textContent = `${name} applied. You save ${formatNaira(discount)}.`;
+    renderSummary();
+  } catch (error) {
+    appliedPromo = null;
+    appliedPromoFingerprint = '';
+    byId('promo-status').textContent = error.message || 'This promo code could not be applied.';
+    renderSummary();
+  } finally {
+    submit.disabled = false;
+  }
 }
 function confirmClear() {
   openModal('Clear your cart?', modal => {
@@ -236,6 +286,7 @@ async function checkout() {
             deliveryOption: byId('delivery').value,
             measurements: { notes: values.notes.trim() },
             paymentMethod: values.paymentMethod,
+            promoCode: appliedPromo?.code || '',
           }),
         });
 
@@ -271,6 +322,7 @@ byId('delivery').onchange = () => {
   if (checkoutAddressInput) checkoutAddressInput.required = byId('delivery').value !== 'pickup';
 };
 byId('clear-cart').onclick = confirmClear;
+byId('promo-form').addEventListener('submit', applyPromo);
 byId('checkout').onclick = checkout;
 window.addEventListener('amadee:cart-change', render);
 async function start(retry = false) {
@@ -291,4 +343,5 @@ async function start(retry = false) {
 }
 byId('retry-cart').onclick = () => start(true);
 initAuth();
+initPromotionAnnouncements('cart-promotions');
 start();

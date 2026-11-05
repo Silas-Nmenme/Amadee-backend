@@ -81,6 +81,19 @@
 .notice { padding: .9rem 1rem; color: #644d06; background: #fff8df; border: 1px solid #eed987; border-radius: var(--radius-sm); }
 #load-more, #view-more-reviews { display: flex; margin: 2rem auto 0; }
 .empty-state { grid-column: 1 / -1; padding: 2rem 1rem; color: var(--muted); text-align: center; }
+.promo-announcements { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.promotion-card { padding: clamp(1.2rem, 3vw, 1.8rem); color: var(--teal-deep); background: linear-gradient(135deg, var(--teal-pale), #fff7df); border: 1px solid var(--border); border-radius: var(--radius); }
+.promotion-card h2 { margin: .25rem 0 .65rem; font-size: clamp(1.25rem, 2.4vw, 1.8rem); }
+.promotion-card p { margin-bottom: .4rem; }
+.promotion-card .eyebrow { color: var(--teal-dark); font-size: .78rem; font-weight: 850; text-transform: uppercase; }
+.promotion-error { grid-column: 1 / -1; color: var(--muted); }
+.promo-entry { margin: 1rem 0; padding: .9rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.promo-entry label { display: block; margin-bottom: .45rem; font-size: .88rem; font-weight: 750; }
+.promo-entry-controls { display: flex; gap: .5rem; }
+.promo-entry-controls input { min-width: 0; }
+.promo-entry-controls .button { min-height: 42px; padding: .6rem .8rem; }
+.promo-entry .form-status:empty { display: none; }
+.promo-entry .form-status:not(:empty) { margin-top: .55rem; font-size: .82rem; }
 
 @keyframes shimmer { to { background-position: -220% 0; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

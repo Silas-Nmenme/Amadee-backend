@@ -4,9 +4,16 @@ import {
   getAdminSubscribers,
 } from "../controllers/adminController.js";
 import {
+  createPromo,
+  getAdminPromos,
+  updatePromo,
+} from "../controllers/promoController.js";
+import {
   requireAuth,
   requireAdmin,
 } from "../middleware/auth.js";
+import { validate } from "../middleware/validate.js";
+import { promoAdminSchema } from "../validators/promoValidator.js";
 
 const router = Router();
 
@@ -18,5 +25,9 @@ router.get("/summary", getAdminSummary);
 
 // GET /api/admin/subscribers
 router.get("/subscribers", getAdminSubscribers);
+
+router.get("/promos", getAdminPromos);
+router.post("/promos", validate(promoAdminSchema), createPromo);
+router.patch("/promos/:id", validate(promoAdminSchema), updatePromo);
 
 export default router;

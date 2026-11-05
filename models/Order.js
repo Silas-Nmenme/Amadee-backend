@@ -190,6 +190,12 @@ const orderSchema = new mongoose.Schema(
       default: "",
     },
 
+    promoCampaignName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     subtotal: {
       type: Number,
       required: true,

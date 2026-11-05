@@ -18,6 +18,7 @@ import adminRouter from "./routes/admin.js";
 import productsRouter from "./routes/products.js";
 import adminProductsRouter from "./routes/adminProducts.js";
 import accountRouter from "./routes/account.js";
+import promosRouter from "./routes/promos.js";
 
 import connectDB from "./config/db.js";
 
@@ -105,6 +106,7 @@ app.get("/", (req, res) => {
 
 // General API routes.
 app.use("/api/config", configRouter);
+app.use("/api/promos", promosRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/account", accountRouter);
 app.use("/api/orders", ordersRouter);

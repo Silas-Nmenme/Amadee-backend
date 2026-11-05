@@ -6,6 +6,7 @@ import { initReviews } from "./modules/reviews.js";
 import { initAuth } from "./modules/auth.js";
 import { byId } from "./modules/utils.js";
 import { initPublicForms } from "./modules/forms.js";
+import { initPromotionAnnouncements } from "./modules/promotions.js";
 
 function init() {
   byId("year").textContent = String(new Date().getFullYear());
@@ -17,6 +18,7 @@ function init() {
   initAuth();
   initMobileNav();
   initPublicForms();
+  initPromotionAnnouncements("homepage-promotions");
 }
 
 function initMobileNav() {
@@ -39,4 +41,3 @@ function initMobileNav() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
-

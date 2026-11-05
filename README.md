@@ -41,8 +41,9 @@ without undoing the related action.
 Signed-in customers can manage their profile and view order history at
 `frontend/account.html`. Orders submitted with a valid session are associated
 with that customer. Administrators can manage orders, inventory, catalogue
-products, subscribers, and summary metrics at `frontend/admin.html`; the
-backend enforces administrator authorization on each management endpoint.
+products, promo campaigns, subscribers, and summary metrics at
+`frontend/admin.html`; the backend enforces administrator authorization on each
+management endpoint.
 To bootstrap the single administrator, configure a random
 `ADMIN_REGISTRATION_KEY` of at least 32 characters in the backend environment.
 Send `POST /api/auth/register-admin` with the same JSON body as normal signup:
@@ -54,6 +55,15 @@ environment. The new administrator can use any email and must complete emailed
 OTP verification before signing in. The setup key is never sent from the
 browser. A database-backed `AdminBootstrap` record makes the setup one-time;
 ordinary `/api/auth/signup` registrations cannot create admin accounts.
+
+Admins can create and edit percentage or fixed-amount promo campaigns, limit
+redemptions, set expiry and minimum-order conditions, restrict eligible product
+codes, and publish announcements. Campaign management is available at
+`/api/admin/promos`; customers can preview a code at `/api/promos/validate`,
+and authenticated order creation revalidates the code and reserves its usage
+limit using server-side catalogue prices. Active published announcements are
+available at `/api/promos/active` and appear on the home page, signed-in account
+dashboard, and cart.
 
 For local development, set `ADMIN_REGISTRATION_KEY` in `.env` and restart the
 API. For Vercel, add it to the project's Environment Variables and redeploy.

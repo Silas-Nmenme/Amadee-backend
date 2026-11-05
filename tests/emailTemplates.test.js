@@ -43,6 +43,8 @@ const order = {
   }],
   subtotal: 20000,
   discount: 0,
+  promoCode: "",
+  promoCampaignName: "",
   deliveryFee: 2000,
   total: 22000,
   paymentMethod: "paystack",
@@ -110,6 +112,12 @@ test("order and notification templates render their database-backed details", ()
     message: "Hello there",
     messageId: "message-123",
   }).replyTo, "customer@example.com");
+});
+
+test("order emails identify redeemed promotional codes", () => {
+  const promoOrder = { ...order, promoCode: "STITCH10", promoCampaignName: "Stitch into savings" };
+  assert.match(orderReceivedEmail(promoOrder).html, /STITCH10 \(Stitch into savings\)/);
+  assert.match(adminNewOrderEmail(promoOrder).text, /Promo code: STITCH10/);
 });
 
 test("best-effort notifications report SMTP configuration failures without throwing", async () => {

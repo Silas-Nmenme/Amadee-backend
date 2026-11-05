@@ -24,6 +24,7 @@
         <a href="./account.html" data-auth-link>Sign in</a>
         <a href="#orders">Orders</a>
         <a href="#products">Products</a>
+        <a href="#promotions">Promotions</a>
         <button id="admin-signout" class="button button-small button-outline" type="button">Sign out</button>
       </nav>
     </div>
@@ -92,6 +93,39 @@
           </div>
         </form>
         <div id="admin-products" class="admin-list"></div>
+      </section>
+
+      <section id="promotions" class="help-block">
+        <div class="admin-section-heading">
+          <div><p class="eyebrow">Marketing</p><h2>Promo campaigns</h2></div>
+          <button id="new-promo" class="button" type="button">Create campaign</button>
+        </div>
+        <p id="promos-status" role="status"></p>
+        <form id="promo-form" class="admin-product-form" hidden>
+          <h3 id="promo-form-title">Create a campaign</h3>
+          <input type="hidden" name="id">
+          <div class="admin-form-grid">
+            <label>Campaign name<input name="name" minlength="2" maxlength="120" required></label>
+            <label>Unique promo code<input name="code" minlength="2" maxlength="40" pattern="[A-Za-z0-9_-]+" required></label>
+            <label>Discount type<select name="type"><option value="percent">Percentage</option><option value="fixed">Fixed amount (NGN)</option></select></label>
+            <label>Discount value<input name="value" type="number" min="1" step="1" required></label>
+            <label>Minimum order subtotal (NGN)<input name="minSubtotal" type="number" min="0" step="1" value="0" required></label>
+            <label>Maximum redemptions <span class="field-help">Leave blank for unlimited.</span><input name="maxUses" type="number" min="1" step="1"></label>
+            <label>Expiry date and time <span class="field-help">Leave blank for no expiry.</span><input name="expiresAt" type="datetime-local"></label>
+          </div>
+          <label>Eligible product codes <span class="field-help">One code per line. Leave empty to apply to all products.</span><textarea name="applicableProductCodes" rows="3"></textarea></label>
+          <label>Announcement text <span class="field-help">Shown on the homepage, account dashboard and cart.</span><textarea name="announcementText" maxlength="500" rows="3"></textarea></label>
+          <div class="admin-checkboxes">
+            <label><input name="publishAnnouncement" type="checkbox"> Publish as a customer announcement</label>
+            <label><input name="active" type="checkbox" checked> Active / redeemable</label>
+          </div>
+          <p id="promo-form-status" class="form-status" role="status"></p>
+          <div class="modal-actions">
+            <button class="button" type="submit">Save campaign</button>
+            <button id="cancel-promo" class="button button-outline" type="button">Cancel</button>
+          </div>
+        </form>
+        <div id="admin-promos" class="admin-list"></div>
       </section>
 
       <section id="subscribers" class="help-block">

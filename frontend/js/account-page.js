@@ -1,6 +1,7 @@
 import { api, safeText, formatNaira } from './modules/utils.js';
 import { clearLocalAccountData } from './modules/account-data.js';
 import { initAuth } from './modules/auth.js';
+import { initPromotionAnnouncements } from './modules/promotions.js';
 
 const status = document.getElementById('account-status');
 const profile = document.getElementById('profile-form');
@@ -30,7 +31,7 @@ async function loadOrders() {
       card.append(
         safeText('h3', `Order ${order.orderId}`),
         safeText('p', itemNames),
-        safeText('p', `Total: ${formatNaira(order.total)} · ${order.paymentStatus} · ${order.orderStatus}`)
+        safeText('p', `Total: ${formatNaira(order.total)} · ${order.discount ? `Saved ${formatNaira(order.discount)}${order.promoCode ? ` with ${order.promoCode}` : ''} · ` : ''}${order.paymentStatus} · ${order.orderStatus}`)
       );
       list.append(card);
     }
@@ -124,6 +125,7 @@ async function start() {
     profile.elements.name.value = user.name || '';
     document.getElementById('account-email').textContent = user.email || '';
     panel.hidden = false;
+    initPromotionAnnouncements('account-promotions');
     message('Welcome back. Make yourself at home.');
     await loadOrders();
     if (user.role === 'admin') {
