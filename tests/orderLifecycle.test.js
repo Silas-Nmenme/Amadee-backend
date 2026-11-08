@@ -2,15 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  confirmManualPayment,
   confirmOrderRefund,
   createOrderRequest,
   reviewOrderRequest,
 } from "../controllers/ordersController.js";
 import Order from "../models/Order.js";
 import {
+  orderSchema,
   orderRequestSchema,
   refundSchema,
   trackingSchema,
+  manualPaymentSchema,
 } from "../validators/orderValidator.js";
 
 function responseRecorder() {
@@ -145,4 +148,53 @@ test("request, tracking URL, and refund validation reject unsafe or incomplete i
     refundReference: "REF-1",
     confirmRefunded: false,
   }).success, false);
+});
+
+test("manual payment references are optional and bounded", () => {
+  assert.equal(manualPaymentSchema.safeParse({}).success, true);
+  assert.equal(manualPaymentSchema.safeParse({ paymentReference: "BANK-REF-19" }).success, true);
+  assert.equal(manualPaymentSchema.safeParse({ paymentReference: "x".repeat(201) }).success, false);
+});
+
+test("order schema accepts optional structured centimetre measurements", () => {
+  const parsed = orderSchema.parse({
+    customer: {
+      name: "Customer Name",
+      email: "customer@example.com",
+      phone: "08000000000",
+      address: "Lagos",
+    },
+    items: [{ productId: "AS-001", quantity: 1, size: "Custom", colour: "Blue" }],
+    deliveryOption: "lagos",
+    paymentMethod: "bank_transfer",
+    measurements: { bustChest: 92.5, waist: "72", hip: 98, length: 110, notes: "Leave room" },
+  });
+
+  assert.equal(parsed.measurements.bustChest, 92.5);
+  assert.equal(parsed.measurements.waist, "72");
+  assert.equal(parsed.measurements.notes, "Leave room");
+});
+
+test("manual payment confirmation is restricted to pending non-Paystack orders", async t => {
+  let filter;
+  let update;
+  const order = { customer: { email: "customer@example.com" } };
+  t.mock.method(Order, "findOneAndUpdate", async (query, changes) => {
+    filter = query;
+    update = changes;
+    return order;
+  });
+  const res = responseRecorder();
+
+  await confirmManualPayment({
+    params: { orderId: "AS-MANUAL-001" },
+    validatedBody: { paymentReference: "BANK-REF-19" },
+  }, res, error => { throw error; });
+
+  assert.deepEqual(filter.paymentMethod.$in, ["bank_transfer", "pay_on_delivery"]);
+  assert.equal(filter.paymentStatus, "pending");
+  assert.equal(filter.inventoryRestoredAt.$exists, false);
+  assert.equal(update.$set.paymentStatus, "paid");
+  assert.equal(update.$set.paymentReference, "BANK-REF-19");
+  assert.equal(res.statusCode, 200);
 });

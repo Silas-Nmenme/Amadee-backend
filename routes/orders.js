@@ -9,6 +9,7 @@ import {
   updateOrderTracking,
   reviewOrderRequest,
   confirmOrderRefund,
+  confirmManualPayment,
 } from "../controllers/ordersController.js";
 
 import {
@@ -18,6 +19,7 @@ import {
   reviewOrderRequestSchema,
   trackingSchema,
   refundSchema,
+  manualPaymentSchema,
 } from "../validators/orderValidator.js";
 
 import { validate } from "../middleware/validate.js";
@@ -77,6 +79,14 @@ router.patch(
   requireAdmin,
   validate(orderStatusSchema),
   updateOrderStatus
+);
+
+router.patch(
+  "/:orderId/payment",
+  requireAuth,
+  requireAdmin,
+  validate(manualPaymentSchema),
+  confirmManualPayment
 );
 
 // Update shipment tracking details.

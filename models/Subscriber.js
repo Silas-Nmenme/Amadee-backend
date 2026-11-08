@@ -22,6 +22,20 @@ const subscriberSchema = new mongoose.Schema(
       default: Date.now,
     },
 
+    consentedAt: {
+      type: Date,
+    },
+
+    consentSource: {
+      type: String,
+      trim: true,
+    },
+
+    unsubscribedAt: {
+      type: Date,
+      default: null,
+    },
+
     unsubscribeToken: {
       type: String,
       default: undefined,

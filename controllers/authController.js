@@ -527,13 +527,19 @@ export async function updateMe(req, res, next) {
    POST /api/auth/logout
 ========================================================= */
 
-export async function logout(req, res) {
-  clearSession(res);
+export async function logout(req, res, next) {
+  try {
+    req.user.sessionVersion = Number(req.user.sessionVersion || 0) + 1;
+    await req.user.save();
+    clearSession(res);
 
-  return res.json({
-    success: true,
-    message: "Signed out successfully.",
-  });
+    return res.json({
+      success: true,
+      message: "Signed out successfully.",
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 /* =========================================================

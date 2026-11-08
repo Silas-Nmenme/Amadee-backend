@@ -11,6 +11,8 @@ import {
   orderReceivedEmail,
   orderStatusEmail,
   orderTrackingEmail,
+  paymentConfirmedEmail,
+  adminPaymentConfirmedEmail,
 } from "../templates/emailTemplates.js";
 
 const deliveryFees = {
@@ -47,6 +49,88 @@ function normalizeMeasurements(input = {}) {
     length: numericMeasurement(input.length),
     notes: input.notes || "",
   };
+}
+
+async function reserveInventory(requestedByProduct) {
+  const reserved = [];
+
+  try {
+    for (const [productCode, quantity] of requestedByProduct) {
+      const product = await Product.findOneAndUpdate(
+        { productCode, active: true, stock: { $gte: quantity } },
+        { $inc: { stock: -quantity } },
+        { new: true }
+      );
+
+      if (!product) {
+        throw createHttpError(`Insufficient stock for ${productCode}. Please refresh your cart.`);
+      }
+
+      reserved.push({ productCode, quantity });
+    }
+    return reserved;
+  } catch (error) {
+    for (const item of reserved.reverse()) {
+      await Product.updateOne(
+        { productCode: item.productCode },
+        { $inc: { stock: item.quantity } }
+      ).catch(rollbackError => {
+        console.error("Inventory reservation rollback failed:", rollbackError?.message || rollbackError);
+      });
+    }
+    throw error;
+  }
+}
+
+async function releaseOrderInventory(order) {
+  if (!order.inventoryDeductedAt || order.inventoryRestoredAt) return;
+
+  const claim = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      inventoryDeductedAt: { $exists: true },
+      inventoryRestoredAt: { $exists: false },
+      inventoryProcessingAt: { $exists: false },
+      paymentStatus: { $ne: "paid" },
+    },
+    { $set: { inventoryProcessingAt: new Date() } },
+    { new: true }
+  );
+  if (!claim) return;
+
+  const quantities = new Map();
+  for (const item of order.items || []) {
+    quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity);
+  }
+
+  const restored = [];
+  try {
+    for (const [productCode, quantity] of quantities) {
+      await Product.updateOne({ productCode }, { $inc: { stock: quantity } });
+      restored.push({ productCode, quantity });
+    }
+    await Order.updateOne(
+      { _id: order._id, inventoryProcessingAt: claim.inventoryProcessingAt },
+      {
+        $set: { inventoryRestoredAt: new Date() },
+        $unset: { inventoryProcessingAt: 1 },
+      }
+    );
+  } catch (error) {
+    for (const item of restored.reverse()) {
+      await Product.updateOne(
+        { productCode: item.productCode },
+        { $inc: { stock: -item.quantity } }
+      ).catch(rollbackError => {
+        console.error("Inventory release rollback failed:", rollbackError?.message || rollbackError);
+      });
+    }
+    await Order.updateOne(
+      { _id: order._id, inventoryProcessingAt: claim.inventoryProcessingAt },
+      { $unset: { inventoryProcessingAt: 1 } }
+    ).catch(() => {});
+    throw error;
+  }
 }
 
 async function notifyOwner(order) {
@@ -241,6 +325,14 @@ export async function createOrder(req, res, next) {
 
     if (promo) await reservePromoUse(promo, req.user._id);
 
+    let reservedInventory = [];
+    try {
+      reservedInventory = await reserveInventory(requestedByProduct);
+    } catch (error) {
+      if (promo) await releasePromoUse(promo._id, req.user._id).catch(() => {});
+      throw error;
+    }
+
     let order;
     try {
       // Save the order before initializing Paystack so the transaction
@@ -261,8 +353,17 @@ export async function createOrder(req, res, next) {
         paymentMethod: body.paymentMethod,
         paymentStatus: "pending",
         orderStatus: "received",
+        inventoryDeductedAt: new Date(),
       });
     } catch (error) {
+      for (const item of reservedInventory.reverse()) {
+        await Product.updateOne(
+          { productCode: item.productCode },
+          { $inc: { stock: item.quantity } }
+        ).catch(rollbackError => {
+          console.error("Inventory rollback after order creation failed:", rollbackError?.message || rollbackError);
+        });
+      }
       if (promo) {
         try {
           await releasePromoUse(promo._id, req.user._id);
@@ -335,6 +436,12 @@ export async function createOrder(req, res, next) {
       ) {
         order.paymentStatus = "failed";
         await order.save();
+        await releaseOrderInventory(order);
+        if (promo) {
+          await releasePromoUse(promo._id, req.user._id).catch(error => {
+            console.error("Could not release promo after payment initialization failed:", error?.message || error);
+          });
+        }
 
         return res.status(502).json({
           orderId: order.orderId,
@@ -547,6 +654,10 @@ export async function updateOrderStatus(req, res, next) {
       });
     }
 
+    if (orderStatus === "cancelled" && order.paymentStatus !== "paid") {
+      await releaseOrderInventory(order);
+    }
+
     if (order.customer?.email) {
       await sendBestEffortMail({
         event: "Order status update",
@@ -559,6 +670,62 @@ export async function updateOrderStatus(req, res, next) {
       order,
       message: "Order status updated successfully.",
     });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function confirmManualPayment(req, res, next) {
+  try {
+    const order = await Order.findOneAndUpdate(
+      {
+        orderId: req.params.orderId,
+        paymentMethod: { $in: ["bank_transfer", "pay_on_delivery"] },
+        paymentStatus: "pending",
+        inventoryDeductedAt: { $exists: true },
+        inventoryRestoredAt: { $exists: false },
+        inventoryProcessingAt: { $exists: false },
+        orderStatus: { $ne: "cancelled" },
+      },
+      {
+        $set: {
+          paymentStatus: "paid",
+          paidAt: new Date(),
+          paymentChannel: "manual",
+          ...(req.validatedBody.paymentReference
+            ? { paymentReference: req.validatedBody.paymentReference }
+            : {}),
+        },
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!order) {
+      const existing = await Order.findOne({ orderId: req.params.orderId });
+      if (!existing) throw createHttpError("Order not found.", 404);
+      if (existing.paymentStatus === "paid") {
+        return res.status(200).json({ order: existing, message: "Payment is already marked as received." });
+      }
+      if (existing.paymentMethod === "paystack") {
+        throw createHttpError("Paystack payments must be confirmed by Paystack.", 409);
+      }
+      throw createHttpError("This order is not eligible for manual payment confirmation.", 409);
+    }
+
+    await Promise.all([
+      sendBestEffortMail({
+        event: "Customer manual payment confirmation",
+        to: order.customer.email,
+        ...paymentConfirmedEmail(order),
+      }),
+      sendBestEffortMail({
+        event: "Admin manual payment confirmation",
+        to: process.env.SHOP_OWNER_EMAIL,
+        ...adminPaymentConfirmedEmail(order),
+      }),
+    ]);
+
+    return res.status(200).json({ order, message: "Payment marked as received." });
   } catch (error) {
     return next(error);
   }
@@ -737,6 +904,9 @@ export async function updateOrderStatus(req, res, next) {
           );
           if (!updatedOrder) {
             throw createHttpError("This request has already been reviewed.", 409);
+          }
+          if (decision === "approved" && request.type === "cancellation" && updatedOrder.paymentStatus !== "paid") {
+            await releaseOrderInventory(updatedOrder);
           }
           const updatedRequest = updatedOrder.orderRequests.id(request._id);
 

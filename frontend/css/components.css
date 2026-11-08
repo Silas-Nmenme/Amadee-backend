@@ -46,7 +46,7 @@
 .product-card .price { display: block; margin: .15rem 0 .75rem; color: var(--teal-dark); font-size: 1.15rem; font-weight: 850; letter-spacing: -.02em; }
 .product-card p { color: var(--muted); font-size: .9rem; }
 .product-card .card-actions { display: flex; gap: .5rem; margin-top: auto; padding-top: .85rem; }
-.product-card .card-actions button { flex: 1; min-width: 0; }
+.product-card .card-actions button, .product-card .card-actions > .button { flex: 1; min-width: 0; }
 .heart-button { padding: .55rem .7rem; color: #a12b48; background: #fff; border: 1px solid var(--border); border-radius: 999px; transition: background var(--transition), border-color var(--transition); }
 .heart-button:hover { background: #fff0f3; border-color: #efb7c4; }
 

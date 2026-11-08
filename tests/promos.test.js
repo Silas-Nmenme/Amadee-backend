@@ -213,6 +213,11 @@ test("order creation recalculates and persists promo discount from backend price
     colours: ["Blue"],
   };
   t.mock.method(Product, "find", () => ({ lean: async () => [product] }));
+  t.mock.method(Product, "findOneAndUpdate", async (filter, update) => {
+    assert.deepEqual(filter, { productCode: "AS-001", active: true, stock: { $gte: 2 } });
+    assert.deepEqual(update, { $inc: { stock: -2 } });
+    return product;
+  });
   t.mock.method(Promo, "findOne", () => ({ lean: async () => activePromo }));
   let reservationUpdate;
   t.mock.method(Promo, "findOneAndUpdate", async (_query, update) => {

@@ -61,6 +61,10 @@ export const orderStatusSchema = z.object({
   ]),
 });
 
+export const manualPaymentSchema = z.object({
+  paymentReference: z.string().trim().max(200).optional().default(""),
+});
+
 export const orderRequestSchema = z.object({
   type: z.enum(["cancellation", "return"]),
   reason: z.string().trim().min(3).max(500),

@@ -154,11 +154,54 @@ async function sendPaymentConfirmation(order) {
  * crash recovery, use a MongoDB transaction and/or inventory ledger.
  */
 async function markOrderPaidAndDeductInventory(order, transaction) {
-  if (order.paymentStatus === "paid" || order.inventoryDeductedAt) {
+  if (order.paymentStatus === "paid") {
     return {
       alreadyProcessed: true,
       order,
     };
+  }
+
+  if (order.orderStatus === "cancelled" || order.inventoryRestoredAt) {
+    throw httpError("This order was cancelled and its inventory was released. Contact the shop about the payment.", 409);
+  }
+
+  if (order.inventoryDeductedAt && !order.inventoryRestoredAt) {
+    const paidAt = transaction.paid_at
+      ? new Date(transaction.paid_at)
+      : new Date();
+    const updatedOrder = await Order.findOneAndUpdate(
+      {
+        _id: order._id,
+        paymentStatus: { $ne: "paid" },
+        inventoryDeductedAt: { $exists: true },
+        inventoryRestoredAt: { $exists: false },
+        inventoryProcessingAt: { $exists: false },
+        orderStatus: { $ne: "cancelled" },
+      },
+      {
+        $set: {
+          paymentStatus: "paid",
+          paidAt,
+          paymentChannel: String(transaction.channel || ""),
+        },
+        $unset: { inventoryProcessingAt: 1 },
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedOrder) {
+      const latest = await Order.findById(order._id).lean();
+      if (latest?.paymentStatus === "paid") {
+        return { alreadyProcessed: true, order: latest };
+      }
+      if (latest?.orderStatus === "cancelled" || latest?.inventoryRestoredAt) {
+        throw httpError("This order was cancelled and its inventory was released. Contact the shop about the payment.", 409);
+      }
+      return { processing: true };
+    }
+
+    await sendPaymentConfirmation(updatedOrder);
+    return { alreadyProcessed: false, order: updatedOrder };
   }
 
   const claim = await Order.findOneAndUpdate(
@@ -167,6 +210,7 @@ async function markOrderPaidAndDeductInventory(order, transaction) {
       paymentStatus: { $ne: "paid" },
       inventoryDeductedAt: { $exists: false },
       inventoryProcessingAt: { $exists: false },
+      orderStatus: { $ne: "cancelled" },
     },
     {
       $set: { inventoryProcessingAt: new Date() },
@@ -182,6 +226,10 @@ async function markOrderPaidAndDeductInventory(order, transaction) {
         alreadyProcessed: true,
         order: latest,
       };
+    }
+
+    if (latest?.orderStatus === "cancelled" || latest?.inventoryRestoredAt) {
+      throw httpError("This order was cancelled and its inventory was released. Contact the shop about the payment.", 409);
     }
 
     return { processing: true };

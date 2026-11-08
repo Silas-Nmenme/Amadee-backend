@@ -496,17 +496,19 @@ export function contactNotificationEmail({ name, email, message, messageId }) {
   };
 }
 
-export function newsletterWelcomeEmail(email) {
+export function newsletterWelcomeEmail(email, unsubscribeToken = "") {
+  const unsubscribeUrl = `${WEBSITE_URL}/unsubscribe.html?token=${encodeURIComponent(unsubscribeToken)}`;
   return {
     subject: `Welcome to the ${BRAND} newsletter`,
-    text: `Thank you for subscribing, ${email}. You'll receive updates from Amadee-Stiches.`,
+    text: `Thank you for subscribing, ${email}. You'll receive updates from Amadee-Stiches. Unsubscribe: ${unsubscribeUrl}`,
     html: emailLayout({
       title: "You’re on the list",
       preheader: "Thank you for subscribing to our updates.",
       content: `<p>Thank you for subscribing to Amadee-Stiches.</p>
         <p>Look out for updates about our latest designs, collections, and offers.</p>
         ${infoPanel(`<strong>${escapeHtml(email)}</strong>`)}
-        ${button("Explore the collection")}`,
+        ${button("Explore the collection")}
+        <p style="color:#647476;font-size:12px">Prefer not to receive updates? <a href="${escapeHtml(unsubscribeUrl)}" style="color:${DEEP_TEAL}">Unsubscribe</a>.</p>`,
     }),
   };
 }

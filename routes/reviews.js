@@ -19,6 +19,7 @@ const reviewSchema = z.object({
   name: z.string().trim().min(2).max(80),
   rating: z.coerce.number().int().min(1).max(5),
   message: z.string().trim().min(5).max(1500),
+  productId: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/).transform(value => value.toUpperCase()).optional(),
   website: z.string().max(200).optional().default(""),
 });
 

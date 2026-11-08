@@ -85,7 +85,7 @@ test("customer order history is scoped to the signed-in user and includes item i
   assert.equal(res.body.orders[0].items[0].quantity, 2);
 });
 
-test("admin revenue includes paid and completed non-refunded orders once", async t => {
+test("admin revenue includes only paid orders", async t => {
   let aggregationPipeline;
   t.mock.method(Order, "countDocuments", async () => 12);
   t.mock.method(User, "countDocuments", async () => 8);
@@ -99,10 +99,7 @@ test("admin revenue includes paid and completed non-refunded orders once", async
 
   await getAdminSummary({}, res, error => { throw error; });
 
-  assert.deepEqual(aggregationPipeline[0].$match.$or, [
-    { paymentStatus: "paid" },
-    { orderStatus: "completed", paymentStatus: { $ne: "refunded" } },
-  ]);
+  assert.deepEqual(aggregationPipeline[0].$match, { paymentStatus: "paid" });
   assert.deepEqual(aggregationPipeline[1].$group.paidCount, {
     $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] },
   });

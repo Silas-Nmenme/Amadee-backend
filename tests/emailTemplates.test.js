@@ -84,7 +84,7 @@ const templates = [
     message: "<Please call me>",
     messageId: "message-123",
   })],
-  ["newsletter welcome", () => newsletterWelcomeEmail(user.email)],
+  ["newsletter welcome", () => newsletterWelcomeEmail(user.email, "test-unsubscribe-token")],
   ["admin newsletter", () => newsletterNotificationEmail(user.email)],
   ["admin review", () => reviewNotificationEmail({
     name: user.name,
@@ -129,6 +129,12 @@ test("order emails identify redeemed promotional codes", () => {
   const promoOrder = { ...order, promoCode: "STITCH10", promoCampaignName: "Stitch into savings" };
   assert.match(orderReceivedEmail(promoOrder).html, /STITCH10 \(Stitch into savings\)/);
   assert.match(adminNewOrderEmail(promoOrder).text, /Promo code: STITCH10/);
+});
+
+test("newsletter welcome email includes an unsubscribe link in both formats", () => {
+  const template = newsletterWelcomeEmail(user.email, "test-unsubscribe-token");
+  assert.match(template.text, /unsubscribe\.html\?token=test-unsubscribe-token/);
+  assert.match(template.html, /unsubscribe\.html\?token=test-unsubscribe-token/);
 });
 
 test("best-effort notifications report SMTP configuration failures without throwing", async () => {

@@ -8,6 +8,7 @@ const adminStatus = byId('admin-status');
 const ordersList = byId('admin-orders');
 const productsList = byId('admin-products');
 const subscribersList = byId('admin-subscribers');
+const messagesList = byId('admin-messages');
 const productForm = byId('product-form');
 const productField = name => productForm.elements.namedItem(name);
 const promoForm = byId('promo-form');
@@ -24,6 +25,8 @@ const orderStatuses = [
 ];
 let currentPage = 1;
 let totalPages = 1;
+let messagesPage = 1;
+let messagesTotalPages = 1;
 let productImagePublicIds = new Map();
 
 initAuth();
@@ -157,6 +160,38 @@ function openOrderDetails(order) {
       itemsHeading,
       items,
     );
+
+    if (
+      order.paymentStatus === 'pending' &&
+      ['bank_transfer', 'pay_on_delivery'].includes(order.paymentMethod)
+    ) {
+      const paymentForm = document.createElement('form');
+      paymentForm.className = 'order-management-form';
+      addField(paymentForm, 'Payment reference (optional)', 'paymentReference');
+      const confirmPayment = safeText('button', 'Mark payment as received', 'button button-outline');
+      confirmPayment.type = 'submit';
+      paymentForm.append(confirmPayment);
+      paymentForm.onsubmit = async event => {
+        event.preventDefault();
+        if (!paymentForm.reportValidity() || confirmPayment.disabled) return;
+        confirmPayment.disabled = true;
+        try {
+          const { order: updated } = await api(`/orders/${encodeURIComponent(order.orderId)}/payment`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              paymentReference: paymentForm.elements.paymentReference.value.trim(),
+            }),
+          });
+          setStatus('orders-status', `Payment for ${order.orderId} was recorded.`);
+          refreshOrderModal(updated);
+          await loadSummary();
+        } catch (error) {
+          setStatus('orders-status', `Payment could not be recorded: ${error.message}`);
+          confirmPayment.disabled = false;
+        }
+      };
+      modal.append(safeText('h3', 'Payment confirmation'), paymentForm);
+    }
 
     const measurements = order.measurements || {};
     const measurementParts = [
@@ -738,6 +773,57 @@ async function loadSubscribers() {
   }
 }
 
+function renderMessage(message) {
+  const record = document.createElement('article');
+  record.className = 'admin-record';
+  const details = document.createElement('div');
+  details.className = 'admin-record-details';
+  const reply = safeText('a', message.email);
+  reply.href = `mailto:${encodeURIComponent(message.email || '')}`;
+  details.append(
+    safeText('h3', message.name || 'Customer enquiry'),
+    reply,
+    safeText('time', displayDate(message.createdAt)),
+    safeText('p', message.message, 'contact-message-body'),
+    safeText('p', message.handled ? 'Handled' : 'Needs a reply', 'eyebrow'),
+  );
+  const toggle = safeText('button', message.handled ? 'Reopen' : 'Mark handled', 'button button-outline');
+  toggle.type = 'button';
+  toggle.onclick = async () => {
+    toggle.disabled = true;
+    try {
+      await api(`/admin/messages/${encodeURIComponent(message._id)}/handled`, {
+        method: 'PATCH',
+        body: JSON.stringify({ handled: !message.handled }),
+      });
+      await loadMessages();
+    } catch (error) {
+      setStatus('messages-status', `Message could not be updated: ${error.message}`);
+      toggle.disabled = false;
+    }
+  };
+  record.append(details, toggle);
+  return record;
+}
+
+async function loadMessages() {
+  setStatus('messages-status', 'Loading contact messages…');
+  try {
+    const { messages, unhandled, pagination } = await api(`/admin/messages?page=${messagesPage}&limit=25`);
+    messagesList.replaceChildren();
+    if (!messages.length) messagesList.append(safeText('p', 'No contact messages yet.'));
+    else messages.forEach(message => messagesList.append(renderMessage(message)));
+    messagesTotalPages = Math.max(1, pagination.pages);
+    messagesPage = pagination.page;
+    byId('messages-page').textContent = `Page ${messagesPage} of ${messagesTotalPages} · ${unhandled} awaiting a reply`;
+    byId('messages-previous').disabled = messagesPage <= 1;
+    byId('messages-next').disabled = messagesPage >= messagesTotalPages;
+    setStatus('messages-status', '');
+  } catch (error) {
+    setStatus('messages-status', `Contact messages could not be loaded: ${error.message}`);
+  }
+}
+
 byId('refresh-orders').onclick = loadOrders;
 byId('orders-previous').onclick = () => {
   if (currentPage > 1) {
@@ -770,6 +856,19 @@ byId('cancel-product').onclick = () => {
   resetProductForm();
 };
 byId('refresh-subscribers').onclick = loadSubscribers;
+byId('refresh-messages').onclick = loadMessages;
+byId('messages-previous').onclick = () => {
+  if (messagesPage > 1) {
+    messagesPage -= 1;
+    loadMessages();
+  }
+};
+byId('messages-next').onclick = () => {
+  if (messagesPage < messagesTotalPages) {
+    messagesPage += 1;
+    loadMessages();
+  }
+};
 productForm.addEventListener('submit', saveProduct);
 promoForm.addEventListener('submit', savePromo);
 productField('images').addEventListener('input', renderProductImagePreviews);
@@ -797,7 +896,7 @@ async function start() {
     }
     adminStatus.textContent = `Signed in as ${user.name} · ${user.email}`;
     dashboard.hidden = false;
-    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadPromos(), loadSubscribers()]);
+    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadPromos(), loadSubscribers(), loadMessages()]);
   } catch (error) {
     if (error.status === 401) {
       adminStatus.textContent = 'Sign in with an administrator account to continue.';

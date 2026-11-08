@@ -307,6 +307,11 @@ const orderSchema = new mongoose.Schema(
       default: undefined,
     },
 
+    inventoryRestoredAt: {
+      type: Date,
+      default: undefined,
+    },
+
     paymentChannel: {
       type: String,
       trim: true,

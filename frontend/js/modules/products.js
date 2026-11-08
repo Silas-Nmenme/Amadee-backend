@@ -13,18 +13,26 @@ let searchQuery = "";
 let apiCatalogueLoaded = false;
 let catalogueStatus = "";
 let catalogueRequest;
+let cataloguePage = 0;
+let cataloguePages = 1;
+let loadedProductCount = 0;
+let filteredProductCount = 0;
+let loadingNextPage = false;
 
 export const isApiCatalogueLoaded = () => apiCatalogueLoaded;
 
 export function loadProductsCatalogue() {
   if (!catalogueRequest) {
-    catalogueRequest = api('/products?limit=50')
-      .then(({ products: records }) => {
+    catalogueRequest = api('/products?page=1&limit=50')
+      .then(({ products: records, pagination }) => {
         if (!Array.isArray(records) || !records.length) {
           catalogueStatus = "The live catalogue is empty. Showing the collection preview; order requests can be sent on WhatsApp.";
           return false;
         }
         apiCatalogueLoaded = setProductsFromApi(records);
+        cataloguePage = pagination?.page || 1;
+        cataloguePages = Math.max(1, pagination?.pages || 1);
+        loadedProductCount = records.length;
         catalogueStatus = apiCatalogueLoaded
           ? ""
           : "The live catalogue could not be displayed. Showing the collection preview; order requests can be sent on WhatsApp.";
@@ -36,6 +44,27 @@ export function loadProductsCatalogue() {
       });
   }
   return catalogueRequest;
+}
+
+async function loadNextCataloguePage() {
+  if (loadingNextPage || !apiCatalogueLoaded || cataloguePage >= cataloguePages) return;
+  loadingNextPage = true;
+  catalogueStatus = 'Loading more styles…';
+  renderProducts();
+  try {
+    const nextPage = cataloguePage + 1;
+    const { products: records, pagination } = await api(`/products?page=${nextPage}&limit=50`);
+    setProductsFromApi(records, { append: true });
+    cataloguePage = pagination?.page || nextPage;
+    cataloguePages = Math.max(cataloguePage, pagination?.pages || cataloguePage);
+    loadedProductCount += records.length;
+    catalogueStatus = '';
+  } catch (error) {
+    catalogueStatus = `More styles could not be loaded (${error.message}). Try again.`;
+  } finally {
+    loadingNextPage = false;
+    renderProducts();
+  }
 }
 
 // Called by search.js whenever the search box changes. Keeping the query
@@ -76,6 +105,7 @@ export function renderProducts() {
   if (sort === "price-asc") list.sort((a, b) => a.price - b.price);
   if (sort === "price-desc") list.sort((a, b) => b.price - a.price);
   if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
+  filteredProductCount = list.length;
 
   const shown = list.slice(0, visibleLimit);
   grid.replaceChildren();
@@ -95,8 +125,13 @@ export function renderProducts() {
   byId("catalogue-status").textContent = catalogueStatus;
 
   const loadMore = byId("load-more");
-  loadMore.classList.toggle("hidden", shown.length >= list.length);
-  loadMore.textContent = `View more (${list.length - shown.length} remaining)`;
+  const hasLoadedItems = shown.length < list.length;
+  const hasMorePages = apiCatalogueLoaded && cataloguePage < cataloguePages;
+  loadMore.classList.toggle("hidden", !hasLoadedItems && !hasMorePages);
+  loadMore.textContent = hasLoadedItems
+    ? `View more (${list.length - shown.length} remaining)`
+    : `Load more styles (${loadedProductCount} loaded)`;
+  loadMore.disabled = loadingNextPage;
 }
 
 export function makeCard(p) {
@@ -123,9 +158,8 @@ export function makeCard(p) {
   const actions = document.createElement("div");
   actions.className = "card-actions";
 
-  const details = safeText("button", "Details", "button button-outline");
-  details.type = "button";
-  details.onclick = () => openProduct(p);
+  const details = safeText("a", "Details", "button button-outline");
+  details.href = `./product.html?code=${encodeURIComponent(p.id)}`;
 
   const add = safeText("button", "Add to cart", "button");
   add.type = "button";
@@ -210,49 +244,6 @@ function readQuantity(qty) {
   return n;
 }
 
-function openProduct(p) {
-  openModal(p.name, (modal) => {
-    const grid = document.createElement("div");
-    grid.className = "modal-grid";
-
-    const img = document.createElement("img");
-    img.src = p.images[0];
-    img.alt = p.name;
-    img.className = "detail-image";
-    img.width = 800;
-    img.height = 1000; // 4:5
-    img.loading = "lazy";
-
-    const info = document.createElement("div");
-    info.append(safeText("p", formatNaira(p.price), "price"), safeText("p", p.description));
-
-    const { sizeLabel, colourLabel, qtyLabel, size, colour, qty } = buildOptionPicker(p);
-    const customNote = safeText(
-      "p",
-      "Need a custom fit? Choose “Custom” size and add measurements during checkout."
-    );
-    const guide = safeText("a", "How to measure →");
-    guide.href = "/size-guide.html";
-    info.append(sizeLabel, colourLabel, qtyLabel, customNote, guide);
-
-    grid.append(img, info);
-    modal.append(grid);
-
-    const actions = document.createElement("div");
-    actions.className = "modal-actions";
-    const add = safeText("button", "Add to cart", "button");
-    add.type = "button";
-    add.onclick = () => {
-      const n = readQuantity(qty);
-      if (n === null) return;
-      addToCart(p.id, n, { size: size.value, colour: colour.value });
-      closeModal();
-    };
-    actions.append(add);
-    modal.append(actions);
-  });
-}
-
 // Quick-add sheet opened from the card's "Add to cart" button, so a size
 // and colour are always chosen without leaving the grid context.
 function openQuickAdd(p) {
@@ -283,9 +274,13 @@ export function initProducts() {
     renderProducts();
   });
   byId("sort-filter").addEventListener("change", renderProducts);
-  byId("load-more").addEventListener("click", () => {
-    visibleLimit += 8;
-    renderProducts();
+  byId("load-more").addEventListener("click", async () => {
+    if (visibleLimit < filteredProductCount || !apiCatalogueLoaded) {
+      visibleLimit += 8;
+      renderProducts();
+      return;
+    }
+    await loadNextCataloguePage();
   });
   renderProducts();
   loadProductsCatalogue().then(renderProducts);

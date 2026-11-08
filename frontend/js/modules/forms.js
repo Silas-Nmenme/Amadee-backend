@@ -13,6 +13,9 @@ export function initPublicForms() {
       status.textContent = 'Sending…';
       try {
         const data = Object.fromEntries(new FormData(form));
+        if (formName === 'newsletter') {
+          data.consent = form.elements.consent.checked;
+        }
         await api(`/${formName}`, { method: 'POST', body: JSON.stringify(data) });
         form.reset();
         status.textContent = formName === 'newsletter' ? 'Thank you. Your request for collection updates has been received.' : 'Thank you. Your message has been received.';

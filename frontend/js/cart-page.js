@@ -149,7 +149,9 @@ function whatsappCheckout() {
     form.onsubmit = e => {
       e.preventDefault(); if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form)); const option = delivery[byId('delivery').value];
-      const extra = `\nDelivery: ${option.label} (${formatNaira(option.fee)})\nEstimated total: ${formatNaira(getSubtotal() + option.fee)}\nName: ${values.name}\nAddress: ${values.address || 'Pick-up'}\nNotes: ${values.notes || 'None'}`;
+      const finalTotal = Math.max(0, getSubtotal() - (appliedPromo?.discount || 0)) + option.fee;
+      const promoLine = appliedPromo ? `\nPromo code: ${appliedPromo.code} (−${formatNaira(appliedPromo.discount)})` : '';
+      const extra = `\nDelivery: ${option.label} (${formatNaira(option.fee)})${promoLine}\nEstimated total: ${formatNaira(finalTotal)}\nName: ${values.name}\nAddress: ${values.address || 'Pick-up'}\nNotes: ${values.notes || 'None'}`;
       window.location.assign(whatsappUrl(extra));
     };
     modal.append(form);
@@ -229,6 +231,29 @@ async function checkout() {
       label.append(input);
       form.append(label);
     }
+    const measurements = document.createElement('fieldset');
+    measurements.className = 'checkout-measurements';
+    const measurementLegend = document.createElement('legend');
+    measurementLegend.textContent = 'Measurements (cm, optional)';
+    measurements.append(measurementLegend);
+    for (const [name, title] of [
+      ['bustChest', 'Bust / chest'],
+      ['waist', 'Waist'],
+      ['hip', 'Hip'],
+      ['length', 'Garment length'],
+    ]) {
+      const label = safeText('label', title);
+      const input = document.createElement('input');
+      input.name = name;
+      input.type = 'number';
+      input.min = '1';
+      input.max = '300';
+      input.step = '0.1';
+      input.inputMode = 'decimal';
+      label.append(input);
+      measurements.append(label);
+    }
+    form.append(measurements);
     const paymentLabel = safeText('label', 'Payment method');
     const payment = document.createElement('select');
     payment.name = 'paymentMethod';
@@ -268,6 +293,10 @@ async function checkout() {
       status.textContent = 'Submitting your order…';
       try {
         const values = Object.fromEntries(new FormData(form));
+        const orderMeasurements = { notes: values.notes.trim() };
+        for (const field of ['bustChest', 'waist', 'hip', 'length']) {
+          if (values[field]) orderMeasurements[field] = Number(values[field]);
+        }
         const result = await api('/orders', {
           method: 'POST',
           body: JSON.stringify({
@@ -284,7 +313,7 @@ async function checkout() {
               colour: item.colour,
             })),
             deliveryOption: byId('delivery').value,
-            measurements: { notes: values.notes.trim() },
+            measurements: orderMeasurements,
             paymentMethod: values.paymentMethod,
             promoCode: appliedPromo?.code || '',
           }),

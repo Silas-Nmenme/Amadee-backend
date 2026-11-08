@@ -48,7 +48,7 @@
           <button id="refresh-orders" class="button button-outline" type="button">Refresh orders</button>
         </div>
         <p id="orders-status" role="status"></p>
-        <p class="field-help">Select an order to view its full details and item photos. Total revenue includes paid orders and completed non-refunded orders.</p>
+        <p class="field-help">Select an order to view its full details and item photos. Revenue includes confirmed payments only.</p>
         <div id="admin-orders" class="admin-list"></div>
         <div class="admin-pagination">
           <button id="orders-previous" class="button button-outline" type="button">Previous</button>
@@ -135,6 +135,20 @@
         </div>
         <p id="subscribers-status" role="status"></p>
         <div id="admin-subscribers" class="admin-subscriber-list"></div>
+      </section>
+
+      <section id="messages" class="help-block">
+        <div class="admin-section-heading">
+          <div><p class="eyebrow">Customer care</p><h2>Contact messages</h2></div>
+          <button id="refresh-messages" class="button button-outline" type="button">Refresh messages</button>
+        </div>
+        <p id="messages-status" role="status"></p>
+        <div id="admin-messages" class="admin-list"></div>
+        <div class="admin-pagination">
+          <button id="messages-previous" class="button button-outline" type="button">Previous</button>
+          <span id="messages-page"></span>
+          <button id="messages-next" class="button button-outline" type="button">Next</button>
+        </div>
       </section>
 
       <section class="help-block">

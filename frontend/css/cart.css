@@ -1,3 +1,17 @@
+.checkout-measurements {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: .75rem;
+	border: 1px solid var(--border);
+	padding: 1rem;
+}
+
+.checkout-measurements legend { padding: 0 .35rem; font-weight: 700; }
+.checkout-measurements label { display: grid; gap: .35rem; }
+
+@media (max-width: 520px) {
+	.checkout-measurements { grid-template-columns: minmax(0, 1fr); }
+}
 [hidden] { display: none !important; }
 .cart-page { min-height: 70vh; padding-top: 2.5rem; }
 .cart-nav { margin-left: auto; display: flex; gap: 1.4rem; align-items: center; }

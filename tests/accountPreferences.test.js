@@ -44,6 +44,7 @@ test("order creation and account preference routes require authentication", () =
 
   for (const [path, method] of [
     ['/:orderId/tracking', 'patch'],
+    ['/:orderId/payment', 'patch'],
     ['/:orderId/requests/:requestId', 'patch'],
     ['/:orderId/requests/:requestId/refund', 'post'],
   ]) {

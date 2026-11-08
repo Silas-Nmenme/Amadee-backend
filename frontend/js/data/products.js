@@ -317,8 +317,11 @@ function categoryKey(category) {
   })[normalized] || normalized.replace(/\s+/g, '-');
 }
 
-export function setProductsFromApi(records) {
+export function setProductsFromApi(records, { append = false } = {}) {
   const fallbackProducts = products;
+  const existingApiProducts = append
+    ? products.filter(product => product.backendAvailable)
+    : [];
   const mappedProducts = records.map(record => {
     const fallback = fallbackProducts.find(product => product.id === record.productCode);
     const images = Array.isArray(record.images)
@@ -349,8 +352,9 @@ export function setProductsFromApi(records) {
     product.images.length
   );
   if (!mappedProducts.length) return false;
-  const mappedIds = new Set(mappedProducts.map(product => product.id));
+  const mappedIds = new Set([...existingApiProducts, ...mappedProducts].map(product => product.id));
   products = [
+    ...existingApiProducts.filter(product => !mappedProducts.some(mapped => mapped.id === product.id)),
     ...mappedProducts,
     ...fallbackProducts
       .filter(product => !mappedIds.has(product.id))
