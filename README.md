@@ -2,12 +2,19 @@
 
 ## Frontend/API integration
 
-The static storefront in `frontend/` sends production API requests to
-`https://amadee-backend.vercel.app/api`. Local development defaults to
+The static storefront in `frontend/` sends production API requests to its own
+`/api` path. `frontend/vercel.json` proxies that path to
+`https://amadee-backend.vercel.app/api`, keeping the HttpOnly session cookie
+first-party in mobile browsers. Deploy the `frontend/` directory as the Vercel
+project root for this rewrite to apply. Local development defaults to
 `http://localhost:3000/api`. Set `window.AMADEE_API_URL` before loading the
 frontend modules to override either API base URL. The backend permits the
 production storefront origin, `https://amadee.vercel.app`, and uses credentialed
-CORS for the HttpOnly session cookie.
+CORS for the session cookie. Deployments on another host need the equivalent
+same-origin `/api` proxy configured there.
+The session cookie defaults to `SameSite=Lax`; keep the API proxy same-origin.
+Set `JWT_COOKIE_SAME_SITE=None` only for a deployment that intentionally uses a
+cross-site API, since mobile browser privacy protections may block its cookie.
 
 Configure additional exact origins with `FRONTEND_ORIGINS` as a comma-separated
 list; the legacy `FRONTEND_ORIGIN` setting is also supported. Localhost origins

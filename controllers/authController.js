@@ -17,6 +17,8 @@ import {
 import {
   accountWelcomeEmail,
   adminNewRegistrationEmail,
+  loginAlertEmail,
+  profileUpdatedEmail,
   passwordChangedEmail,
   passwordResetEmail,
 } from "../templates/emailTemplates.js";
@@ -69,7 +71,7 @@ const cookieName =
   process.env.JWT_COOKIE_NAME || "amadee_session";
 
 const cookieSameSite =
-  process.env.NODE_ENV === "production" ? "none" : "lax";
+  (process.env.JWT_COOKIE_SAME_SITE || "lax").toLowerCase();
 
 const cookieOptions = {
   httpOnly: true,
@@ -91,6 +93,40 @@ const otpFields =
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
+}
+
+function loginClientDetails(req) {
+  const userAgent = req.get("user-agent") || "";
+  const browser = /Edg\//i.test(userAgent)
+    ? "Microsoft Edge"
+    : /Firefox\//i.test(userAgent)
+      ? "Firefox"
+      : /CriOS\//i.test(userAgent)
+        ? "Chrome for iOS"
+        : /Chrome\//i.test(userAgent)
+          ? "Chrome"
+          : /Version\/.*Safari\//i.test(userAgent)
+            ? "Safari"
+            : "Unknown browser";
+  const device = /iPhone/i.test(userAgent)
+    ? "iPhone"
+    : /iPad/i.test(userAgent)
+      ? "iPad"
+      : /Android/i.test(userAgent)
+        ? "Android device"
+        : /Windows/i.test(userAgent)
+          ? "Windows device"
+          : /Macintosh|Mac OS/i.test(userAgent)
+            ? "Mac"
+            : /Linux/i.test(userAgent)
+              ? "Linux device"
+              : "Unknown device";
+
+  return {
+    browser,
+    device,
+    ipAddress: typeof req.ip === "string" ? req.ip : "",
+  };
 }
 
 function publicUser(user) {
@@ -473,6 +509,16 @@ export async function login(req, res, next) {
 
     setSession(res, user);
 
+    void sendBestEffortMail({
+      event: "Successful login alert",
+      to: user.email,
+      ...loginAlertEmail({
+        user,
+        occurredAt: user.lastLoginAt,
+        ...loginClientDetails(req),
+      }),
+    });
+
     return res.json({
       success: true,
       message: "Login successful.",
@@ -509,8 +555,21 @@ export async function updateMe(req, res, next) {
       });
     }
 
+    const previousName = req.user.name;
     req.user.name = parsed.data.name;
     await req.user.save();
+
+    if (previousName !== req.user.name) {
+      void sendBestEffortMail({
+        event: "Profile name change notice",
+        to: req.user.email,
+        ...profileUpdatedEmail({
+          user: req.user,
+          previousName,
+          updatedAt: new Date(),
+        }),
+      });
+    }
 
     return res.status(200).json({
       success: true,

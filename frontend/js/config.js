@@ -1,7 +1,7 @@
 const isLocalDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
 const defaultApiUrl = isLocalDevelopment
   ? "http://localhost:3000/api"
-  : "https://amadee-backend.vercel.app/api";
+  : `${window.location.origin}/api`;
 const configuredApiUrl = (window.AMADEE_API_URL || defaultApiUrl)
   .replace(/\/+$/, "");
 

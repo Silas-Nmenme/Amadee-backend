@@ -23,6 +23,7 @@ import promosRouter from "./routes/promos.js";
 import connectDB from "./config/db.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 const port = Number(process.env.PORT) || 3000;
 const productionFrontendOrigin = "https://amadee.vercel.app";

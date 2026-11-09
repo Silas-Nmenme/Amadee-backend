@@ -297,6 +297,11 @@ const orderSchema = new mongoose.Schema(
       default: [],
     },
 
+    paymentFailureNotifiedAt: {
+      type: Date,
+      default: undefined,
+    },
+
     inventoryProcessingAt: {
       type: Date,
       default: undefined,

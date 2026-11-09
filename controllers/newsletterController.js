@@ -3,6 +3,7 @@ import Subscriber from "../models/Subscriber.js";
 import { sendBestEffortMail } from "../services/mailer.js";
 import {
   newsletterNotificationEmail,
+  newsletterUnsubscribeEmail,
   newsletterWelcomeEmail,
 } from "../templates/emailTemplates.js";
 
@@ -83,6 +84,14 @@ export async function unsubscribeNewsletter(req, res, next) {
       },
       { new: true }
     );
+
+    if (subscriber) {
+      void sendBestEffortMail({
+        event: "Newsletter unsubscribe confirmation",
+        to: subscriber.email,
+        ...newsletterUnsubscribeEmail(subscriber.email),
+      });
+    }
 
     return res.status(200).json({
       message: subscriber

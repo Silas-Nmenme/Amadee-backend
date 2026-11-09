@@ -7,14 +7,19 @@ import {
   adminNewRegistrationEmail,
   adminPaymentConfirmedEmail,
   contactNotificationEmail,
+  contactReceiptEmail,
+  loginAlertEmail,
   newsletterNotificationEmail,
+  newsletterUnsubscribeEmail,
   newsletterWelcomeEmail,
   orderRequestEmail,
   orderReceivedEmail,
   orderStatusEmail,
   orderTrackingEmail,
   passwordChangedEmail,
+  profileUpdatedEmail,
   passwordResetEmail,
+  paymentAttemptFailedEmail,
   paymentConfirmedEmail,
   reviewNotificationEmail,
   verificationEmail,
@@ -62,6 +67,8 @@ const templates = [
   ["verification", () => verificationEmail({ name: user.name, otp: "123456", minutes: 5 })],
   ["password reset", () => passwordResetEmail({ otp: "123456" })],
   ["password changed", () => passwordChangedEmail(user)],
+  ["login alert", () => loginAlertEmail({ user, occurredAt: new Date("2026-11-02T12:00:00Z"), browser: "Safari", device: "iPhone", ipAddress: "203.0.113.5" })],
+  ["profile updated", () => profileUpdatedEmail({ user, previousName: "Old Name", updatedAt: new Date("2026-11-02T12:00:00Z") })],
   ["account welcome", () => accountWelcomeEmail(user)],
   ["new registration", () => adminNewRegistrationEmail(user)],
   ["order received", () => orderReceivedEmail(order)],
@@ -84,8 +91,11 @@ const templates = [
     message: "<Please call me>",
     messageId: "message-123",
   })],
+  ["contact receipt", () => contactReceiptEmail({ name: user.name, messageId: "message-123" })],
   ["newsletter welcome", () => newsletterWelcomeEmail(user.email, "test-unsubscribe-token")],
+  ["newsletter unsubscribe", () => newsletterUnsubscribeEmail(user.email)],
   ["admin newsletter", () => newsletterNotificationEmail(user.email)],
+  ["payment attempt failed", () => paymentAttemptFailedEmail(order)],
   ["admin review", () => reviewNotificationEmail({
     name: user.name,
     rating: 5,
@@ -135,6 +145,23 @@ test("newsletter welcome email includes an unsubscribe link in both formats", ()
   const template = newsletterWelcomeEmail(user.email, "test-unsubscribe-token");
   assert.match(template.text, /unsubscribe\.html\?token=test-unsubscribe-token/);
   assert.match(template.html, /unsubscribe\.html\?token=test-unsubscribe-token/);
+});
+
+test("new account, contact, unsubscribe, and payment notices include safe details", () => {
+  const login = loginAlertEmail({
+    user,
+    occurredAt: new Date("2026-11-02T12:00:00Z"),
+    browser: "Safari",
+    device: "iPhone",
+    ipAddress: "203.0.113.5",
+  });
+  assert.match(login.text, /Safari/);
+  assert.match(login.html, /203\.0\.113\.5/);
+  assert.match(login.html, /&lt;Customer&gt;/);
+  assert.match(profileUpdatedEmail({ user, previousName: "Old Name", updatedAt: new Date() }).text, /Old Name/);
+  assert.match(contactReceiptEmail({ name: user.name, messageId: "message-123" }).html, /message-123/);
+  assert.match(newsletterUnsubscribeEmail(user.email).text, /unsubscribed/);
+  assert.match(paymentAttemptFailedEmail(order).html, /AS-TEST-123/);
 });
 
 test("best-effort notifications report SMTP configuration failures without throwing", async () => {

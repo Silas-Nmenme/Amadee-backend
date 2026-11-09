@@ -20,12 +20,19 @@ test("unsubscribe route validates a token and deactivates the matching subscribe
   t.mock.method(Subscriber, "findOneAndUpdate", async (query, changes) => {
     filter = query;
     update = changes;
-    return { active: false };
+    return { active: false, email: "customer@example.com" };
   });
   const token = "x".repeat(43);
   const res = responseRecorder();
+  const originalError = console.error;
+  console.error = () => {};
 
-  await unsubscribeNewsletter({ validatedBody: { token } }, res, error => { throw error; });
+  try {
+    await unsubscribeNewsletter({ validatedBody: { token } }, res, error => { throw error; });
+    await new Promise(resolve => setImmediate(resolve));
+  } finally {
+    console.error = originalError;
+  }
 
   assert.equal(filter.active, true);
   assert.equal(filter.unsubscribeToken.length, 64);

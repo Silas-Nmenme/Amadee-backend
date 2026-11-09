@@ -6,6 +6,7 @@ import { sendBestEffortMail } from "../services/mailer.js";
 import {
   adminPaymentConfirmedEmail,
   paymentConfirmedEmail,
+  paymentAttemptFailedEmail,
 } from "../templates/emailTemplates.js";
 
 const PAYSTACK_API = "https://api.paystack.co";
@@ -524,6 +525,45 @@ export async function paystackWebhook(req, res, next) {
     }
 
     const event = req.body;
+
+    if (event?.event === "charge.failed") {
+      const failedReference = event?.data?.reference;
+      if (typeof failedReference !== "string" || !failedReference) {
+        return res.status(400).json({ message: "Webhook payment reference is missing." });
+      }
+
+      const failedOrder = await Order.findOneAndUpdate(
+        {
+          $or: [
+            { orderId: failedReference },
+            { paymentReference: failedReference },
+            { paymentReferences: failedReference },
+          ],
+          paymentMethod: "paystack",
+          paymentStatus: { $in: ["pending", "failed"] },
+          paymentFailureNotifiedAt: { $exists: false },
+        },
+        { $set: { paymentFailureNotifiedAt: new Date() } },
+        { new: true }
+      );
+
+      if (failedOrder) {
+        void Promise.all([
+          sendBestEffortMail({
+            event: "Customer Paystack payment attempt failed",
+            to: failedOrder.customer?.email,
+            ...paymentAttemptFailedEmail(failedOrder, "customer"),
+          }),
+          sendBestEffortMail({
+            event: "Admin Paystack payment attempt failed",
+            to: process.env.SHOP_OWNER_EMAIL,
+            ...paymentAttemptFailedEmail(failedOrder, "admin"),
+          }),
+        ]);
+      }
+
+      return res.sendStatus(200);
+    }
 
     // Acknowledge unrelated events after their signatures have been checked.
     if (event?.event !== "charge.success") {

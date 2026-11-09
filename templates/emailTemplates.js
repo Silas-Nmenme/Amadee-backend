@@ -201,6 +201,55 @@ export function passwordChangedEmail(user) {
   };
 }
 
+export function loginAlertEmail({ user, occurredAt, browser, device, ipAddress }) {
+  const name = user?.name || "there";
+  const time = new Date(occurredAt).toLocaleString("en-NG", {
+    timeZone: "Africa/Lagos",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const details = [
+    ["Time (WAT)", time],
+    ["Browser", browser || "Unavailable"],
+    ["Device", device || "Unavailable"],
+    ["IP address", ipAddress || "Unavailable"],
+  ];
+  return {
+    subject: `New sign-in to your account | ${BRAND}`,
+    text: `Hello ${name}, a successful sign-in to your account was recorded.\nTime (WAT): ${time}\nBrowser: ${browser || "Unavailable"}\nDevice: ${device || "Unavailable"}\nIP address: ${ipAddress || "Unavailable"}\n\nIf this was not you, reset your password and contact the shop.`,
+    html: emailLayout({
+      title: "A new sign-in was detected",
+      preheader: "A successful sign-in to your account was recorded.",
+      content: `<p>Hello ${escapeHtml(name)},</p>
+        <p>A successful sign-in to your Amadee-Stiches account was recorded.</p>
+        ${detailTable(details)}
+        <p>If this was not you, reset your password and contact our team.</p>
+        ${button("Review account security", `${WEBSITE_URL}/forgot-password.html`)}`,
+    }),
+  };
+}
+
+export function profileUpdatedEmail({ user, previousName, updatedAt }) {
+  const name = user?.name || "there";
+  const time = new Date(updatedAt).toLocaleString("en-NG", {
+    timeZone: "Africa/Lagos",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  return {
+    subject: `Your profile was updated | ${BRAND}`,
+    text: `Hello ${name}, your account name changed from ${previousName} to ${name} on ${time} WAT. If you did not make this change, contact the shop.`,
+    html: emailLayout({
+      title: "Your profile was updated",
+      preheader: "A change was made to your account profile.",
+      content: `<p>Hello ${escapeHtml(name)},</p>
+        <p>Your account name was updated.</p>
+        ${detailTable([["Previous name", previousName], ["Current name", name], ["Time (WAT)", time]])}
+        <p>If you did not make this change, contact our team to secure your account.</p>`,
+    }),
+  };
+}
+
 export function accountWelcomeEmail(user) {
   const name = user.name || "there";
   return {
@@ -496,6 +545,20 @@ export function contactNotificationEmail({ name, email, message, messageId }) {
   };
 }
 
+export function contactReceiptEmail({ name, messageId }) {
+  return {
+    subject: `We received your message | ${BRAND}`,
+    text: `Hello ${name}, we received your message and the shop team will follow up. Reference: ${messageId}.`,
+    html: emailLayout({
+      title: "Your message is with our team",
+      preheader: "We received your enquiry and will follow up.",
+      content: `<p>Hello ${escapeHtml(name)},</p>
+        <p>Thank you for contacting Amadee-Stiches. Your message has been received and the shop team will follow up.</p>
+        ${infoPanel(`<strong>Reference: ${escapeHtml(messageId)}</strong>`)}`,
+    }),
+  };
+}
+
 export function newsletterWelcomeEmail(email, unsubscribeToken = "") {
   const unsubscribeUrl = `${WEBSITE_URL}/unsubscribe.html?token=${encodeURIComponent(unsubscribeToken)}`;
   return {
@@ -513,6 +576,19 @@ export function newsletterWelcomeEmail(email, unsubscribeToken = "") {
   };
 }
 
+export function newsletterUnsubscribeEmail(email) {
+  return {
+    subject: `You have unsubscribed | ${BRAND}`,
+    text: `This confirms that ${email} has been unsubscribed from Amadee-Stiches collection updates. You will not receive further newsletter emails unless you subscribe again.`,
+    html: emailLayout({
+      title: "You are unsubscribed",
+      preheader: "Your email preferences have been updated.",
+      content: `<p>This confirms that <strong>${escapeHtml(email)}</strong> has been unsubscribed from collection updates.</p>
+        <p>You will not receive further newsletter emails unless you subscribe again.</p>`,
+    }),
+  };
+}
+
 export function newsletterNotificationEmail(email) {
   return {
     subject: `New newsletter subscriber | ${BRAND}`,
@@ -522,6 +598,27 @@ export function newsletterNotificationEmail(email) {
       preheader: "A customer subscribed to store updates.",
       content: `<p>A new email address has subscribed to collection updates.</p>
         ${infoPanel(`<strong>${escapeHtml(email)}</strong>`)}`,
+    }),
+  };
+}
+
+export function paymentAttemptFailedEmail(order, audience = "customer") {
+  const isCustomer = audience === "customer";
+  const name = order.customer?.name || "Customer";
+  const title = isCustomer ? "Your payment was not completed" : "A Paystack payment attempt failed";
+  const note = isCustomer
+    ? "This payment attempt was not successful. Your order is not marked paid. If you want to try again, use the payment option provided for your order or contact the shop."
+    : "A Paystack payment attempt did not complete. The order remains unpaid; check the transaction and follow up with the customer if needed.";
+  return {
+    subject: `${title} | ${BRAND}`,
+    text: `${isCustomer ? `Hello ${name}, ` : ""}${note}\nOrder reference: ${order.orderId}.`,
+    html: emailLayout({
+      title,
+      preheader: `Payment attempt update for order ${order.orderId}.`,
+      content: `${isCustomer ? `<p>Hello ${escapeHtml(name)},</p>` : ""}
+        <p>${escapeHtml(note)}</p>
+        ${detailTable([["Order reference", order.orderId], ["Amount", formatNaira(order.total)], ["Payment status", "Not paid"]])}
+        ${isCustomer ? button("View your account", `${WEBSITE_URL}/account.html`) : ""}`,
     }),
   };
 }

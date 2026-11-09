@@ -1,6 +1,9 @@
 import Message from "../models/Message.js";
 import { sendBestEffortMail } from "../services/mailer.js";
-import { contactNotificationEmail } from "../templates/emailTemplates.js";
+import {
+  contactNotificationEmail,
+  contactReceiptEmail,
+} from "../templates/emailTemplates.js";
 
 export const submitContactMessage = async (req, res, next) => {
   try {
@@ -20,16 +23,26 @@ export const submitContactMessage = async (req, res, next) => {
       message,
     });
 
-    const notified = await sendBestEffortMail({
-      event: "Contact enquiry notification",
-      to: process.env.SHOP_OWNER_EMAIL,
-      ...contactNotificationEmail({
-        name,
-        email,
-        message,
-        messageId: String(savedMessage._id),
+    const [notified] = await Promise.all([
+      sendBestEffortMail({
+        event: "Contact enquiry notification",
+        to: process.env.SHOP_OWNER_EMAIL,
+        ...contactNotificationEmail({
+          name,
+          email,
+          message,
+          messageId: String(savedMessage._id),
+        }),
       }),
-    });
+      sendBestEffortMail({
+        event: "Contact message receipt",
+        to: email,
+        ...contactReceiptEmail({
+          name,
+          messageId: String(savedMessage._id),
+        }),
+      }),
+    ]);
     if (!notified) {
       return res.status(202).json({
         message:
