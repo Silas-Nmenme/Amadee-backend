@@ -73,11 +73,18 @@ export async function submitNewsletterSubscription(req, res, next) {
 
 export async function unsubscribeNewsletter(req, res, next) {
   try {
+    const rawToken = req.validatedBody.token;
     const tokenHash = createHash("sha256")
-      .update(req.validatedBody.token)
+      .update(rawToken)
       .digest("hex");
     const subscriber = await Subscriber.findOneAndUpdate(
-      { unsubscribeToken: tokenHash, active: true },
+      {
+        active: true,
+        $or: [
+          { unsubscribeToken: tokenHash },
+          { unsubscribeToken: rawToken },
+        ],
+      },
       {
         $set: { active: false, unsubscribedAt: new Date() },
         $unset: { unsubscribeToken: 1 },

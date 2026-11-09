@@ -45,6 +45,13 @@ content or credentials). Order, payment,
 contact, newsletter, review, and account-notice delivery failures are logged
 without undoing the related action.
 
+Administrators can compose plain-text newsletters in the dashboard. Campaigns
+are saved in MongoDB and processed in bounded batches (10 recipients by
+default); set `NEWSLETTER_BATCH_SIZE` from 1 to 25 to match the SMTP provider.
+Each active subscriber receives an individual email with an unsubscribe link.
+If the admin page closes before delivery completes, the queued campaign remains
+in newsletter history and can be resumed after signing in again.
+
 Signed-in customers can manage their profile and view their complete, account-
 scoped order history with item images and order details at `frontend/account.html`.
 Orders submitted with a valid session are associated with that customer.

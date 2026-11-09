@@ -18,6 +18,12 @@ import {
 import { validate } from "../middleware/validate.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { promoAdminSchema } from "../validators/promoValidator.js";
+import { newsletterCampaignSchema } from "../validators/newsletterValidator.js";
+import {
+  createNewsletterCampaign,
+  getNewsletterCampaigns,
+  processNewsletterCampaignBatch,
+} from "../controllers/newsletterCampaignController.js";
 
 const router = Router();
 const messageStatusSchema = z.object({ handled: z.boolean() }).strict();
@@ -30,6 +36,13 @@ router.get("/summary", getAdminSummary);
 
 // GET /api/admin/subscribers
 router.get("/subscribers", getAdminSubscribers);
+router.get("/newsletters", getNewsletterCampaigns);
+router.post("/newsletters", validate(newsletterCampaignSchema), createNewsletterCampaign);
+router.post(
+  "/newsletters/:campaignId/process",
+  validateObjectId("campaignId"),
+  processNewsletterCampaignBatch
+);
 router.get("/messages", getAdminMessages);
 router.patch(
   "/messages/:messageId/handled",

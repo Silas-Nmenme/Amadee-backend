@@ -8,6 +8,9 @@ const adminStatus = byId('admin-status');
 const ordersList = byId('admin-orders');
 const productsList = byId('admin-products');
 const subscribersList = byId('admin-subscribers');
+const newsletterForm = byId('newsletter-form');
+const newsletterSubmit = byId('send-newsletter');
+const newsletterHistory = byId('admin-newsletter-history');
 const messagesList = byId('admin-messages');
 const productForm = byId('product-form');
 const productField = name => productForm.elements.namedItem(name);
@@ -27,6 +30,7 @@ let currentPage = 1;
 let totalPages = 1;
 let messagesPage = 1;
 let messagesTotalPages = 1;
+let activeSubscriberCount = 0;
 let productImagePublicIds = new Map();
 
 initAuth();
@@ -754,6 +758,9 @@ async function loadSubscribers() {
   setStatus('subscribers-status', 'Loading subscribers…');
   try {
     const { subscribers, count } = await api('/admin/subscribers');
+    activeSubscriberCount = count;
+    byId('subscriber-count').textContent = `${count} active subscriber${count === 1 ? '' : 's'} will receive a newsletter.`;
+    newsletterSubmit.disabled = count === 0;
     subscribersList.replaceChildren();
     if (!count) subscribersList.append(safeText('p', 'No active subscribers yet.'));
     else {
@@ -770,6 +777,104 @@ async function loadSubscribers() {
     setStatus('subscribers-status', `${count} active subscribers.`);
   } catch (error) {
     setStatus('subscribers-status', `Subscribers could not be loaded: ${error.message}`);
+  }
+}
+
+function renderNewsletterCampaign(campaign) {
+  const record = document.createElement('article');
+  record.className = 'admin-record';
+  const details = document.createElement('div');
+  details.className = 'admin-record-details';
+  details.append(
+    safeText('h3', campaign.subject),
+    safeText('p', `${labelize(campaign.status)} · ${campaign.sentCount} sent · ${campaign.failedCount} failed · ${campaign.skippedCount} skipped · ${campaign.recipientCount} recipients`),
+    safeText('time', displayDate(campaign.createdAt)),
+  );
+  record.append(details);
+  if (['queued', 'sending'].includes(campaign.status)) {
+    const resume = safeText('button', 'Continue sending', 'button button-outline');
+    resume.type = 'button';
+    resume.onclick = () => runNewsletterCampaign(campaign, resume);
+    record.append(resume);
+  }
+  return record;
+}
+
+async function loadNewsletterCampaigns() {
+  setStatus('newsletter-history-status', 'Loading newsletter history…');
+  try {
+    const { campaigns } = await api('/admin/newsletters');
+    newsletterHistory.replaceChildren();
+    if (!campaigns.length) newsletterHistory.append(safeText('p', 'No newsletters have been sent yet.'));
+    campaigns.forEach(campaign => newsletterHistory.append(renderNewsletterCampaign(campaign)));
+    setStatus('newsletter-history-status', '');
+  } catch (error) {
+    setStatus('newsletter-history-status', `Newsletter history could not be loaded: ${error.message}`);
+  }
+}
+
+async function runNewsletterCampaign(campaign, button = newsletterSubmit) {
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Sending…';
+  try {
+    let current = campaign;
+    while (['queued', 'sending'].includes(current.status)) {
+      setStatus(
+        'newsletter-send-status',
+        `Sending “${current.subject}”… ${current.sentCount + current.failedCount + current.skippedCount} of ${current.recipientCount} processed.`,
+      );
+      const result = await api(`/admin/newsletters/${encodeURIComponent(current.id)}/process`, {
+        method: 'POST',
+      });
+      current = result.campaign;
+    }
+    const summary = `${current.sentCount} sent, ${current.failedCount} failed, ${current.skippedCount} skipped.`;
+    setStatus(
+      'newsletter-send-status',
+      current.status === 'completed'
+        ? `Newsletter sent. ${summary}`
+        : `Newsletter processing finished with delivery issues. ${summary}`,
+    );
+    await loadNewsletterCampaigns();
+    await loadSubscribers();
+  } catch (error) {
+    setStatus('newsletter-send-status', `Newsletter is queued and can be resumed. ${error.message}`);
+    await loadNewsletterCampaigns();
+  } finally {
+    button.textContent = originalLabel;
+    button.disabled = activeSubscriberCount === 0;
+  }
+}
+
+async function sendNewsletter(event) {
+  event.preventDefault();
+  if (!newsletterForm.reportValidity() || newsletterSubmit.disabled) return;
+  const subject = newsletterForm.elements.subject.value.trim();
+  const message = newsletterForm.elements.message.value.trim();
+  if (!activeSubscriberCount) {
+    setStatus('newsletter-send-status', 'There are no active subscribers to receive this newsletter.');
+    return;
+  }
+  const confirmed = window.confirm(
+    `Send “${subject}” to ${activeSubscriberCount} active subscriber${activeSubscriberCount === 1 ? '' : 's'}?`,
+  );
+  if (!confirmed) return;
+
+  newsletterSubmit.disabled = true;
+  newsletterSubmit.textContent = 'Queueing…';
+  setStatus('newsletter-send-status', 'Queueing newsletter…');
+  try {
+    const { campaign } = await api('/admin/newsletters', {
+      method: 'POST',
+      body: JSON.stringify({ subject, message }),
+    });
+    newsletterForm.reset();
+    await runNewsletterCampaign(campaign);
+  } catch (error) {
+    setStatus('newsletter-send-status', `Newsletter could not be queued: ${error.message}`);
+    newsletterSubmit.textContent = 'Send to subscribers';
+    newsletterSubmit.disabled = activeSubscriberCount === 0;
   }
 }
 
@@ -856,6 +961,7 @@ byId('cancel-product').onclick = () => {
   resetProductForm();
 };
 byId('refresh-subscribers').onclick = loadSubscribers;
+newsletterForm.addEventListener('submit', sendNewsletter);
 byId('refresh-messages').onclick = loadMessages;
 byId('messages-previous').onclick = () => {
   if (messagesPage > 1) {
@@ -896,7 +1002,7 @@ async function start() {
     }
     adminStatus.textContent = `Signed in as ${user.name} · ${user.email}`;
     dashboard.hidden = false;
-    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadPromos(), loadSubscribers(), loadMessages()]);
+    await Promise.all([loadSummary(), loadOrders(), loadProducts(), loadPromos(), loadSubscribers(), loadNewsletterCampaigns(), loadMessages()]);
   } catch (error) {
     if (error.status === 401) {
       adminStatus.textContent = 'Sign in with an administrator account to continue.';

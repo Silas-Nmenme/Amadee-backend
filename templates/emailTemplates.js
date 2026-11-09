@@ -576,6 +576,21 @@ export function newsletterWelcomeEmail(email, unsubscribeToken = "") {
   };
 }
 
+export function newsletterCampaignEmail({ subject, message, unsubscribeToken }) {
+  const unsubscribeUrl = `${WEBSITE_URL}/unsubscribe.html?token=${encodeURIComponent(unsubscribeToken)}`;
+  const escapedMessage = escapeHtml(message).replace(/\r?\n/g, "<br>");
+  return {
+    subject,
+    text: `${message}\n\nUnsubscribe from collection updates: ${unsubscribeUrl}`,
+    html: emailLayout({
+      title: subject,
+      preheader: "A new message from Amadee-Stiches.",
+      content: `<div style="font-size:15px;line-height:1.75">${escapedMessage}</div>
+        <p style="margin-top:28px;color:#647476;font-size:12px">You are receiving this because you subscribed to collection updates. <a href="${escapeHtml(unsubscribeUrl)}" style="color:${DEEP_TEAL}">Unsubscribe</a>.</p>`,
+    }),
+  };
+}
+
 export function newsletterUnsubscribeEmail(email) {
   return {
     subject: `You have unsubscribed | ${BRAND}`,

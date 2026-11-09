@@ -70,17 +70,18 @@ export const getAdminSummary = async (_req, res, next) => {
  */
 export const getAdminSubscribers = async (_req, res, next) => {
   try {
-    const subscribers = await Subscriber.find({
-      active: true,
-    })
-      .select("email subscribedAt")
-      .sort({ subscribedAt: -1 })
-      .limit(1000)
-      .lean();
+    const [subscribers, count] = await Promise.all([
+      Subscriber.find({ active: true })
+        .select("email subscribedAt")
+        .sort({ subscribedAt: -1 })
+        .limit(1000)
+        .lean(),
+      Subscriber.countDocuments({ active: true }),
+    ]);
 
     return res.status(200).json({
       subscribers,
-      count: subscribers.length,
+      count,
     });
   } catch (err) {
     next(err);

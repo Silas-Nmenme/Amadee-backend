@@ -134,6 +134,20 @@
           <button id="refresh-subscribers" class="button button-outline" type="button">Refresh subscribers</button>
         </div>
         <p id="subscribers-status" role="status"></p>
+        <p id="subscriber-count" class="field-help" aria-live="polite">Checking active subscriber count…</p>
+        <form id="newsletter-form" class="admin-product-form newsletter-compose-form">
+          <h3>Compose a newsletter</h3>
+          <label for="newsletter-subject">Subject</label>
+          <input id="newsletter-subject" name="subject" minlength="3" maxlength="150" required>
+          <label for="newsletter-message">Message</label>
+          <textarea id="newsletter-message" name="message" rows="8" minlength="10" maxlength="12000" required></textarea>
+          <p class="field-help">Plain text; line breaks are preserved. Each active subscriber receives an individual email with an unsubscribe link.</p>
+          <p id="newsletter-send-status" class="form-status" role="status" aria-live="polite"></p>
+          <button id="send-newsletter" class="button" type="submit" disabled>Send to subscribers</button>
+        </form>
+        <h3>Recent newsletters</h3>
+        <p id="newsletter-history-status" role="status"></p>
+        <div id="admin-newsletter-history" class="admin-list"></div>
         <div id="admin-subscribers" class="admin-subscriber-list"></div>
       </section>
 

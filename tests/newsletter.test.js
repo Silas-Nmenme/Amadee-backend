@@ -35,7 +35,8 @@ test("unsubscribe route validates a token and deactivates the matching subscribe
   }
 
   assert.equal(filter.active, true);
-  assert.equal(filter.unsubscribeToken.length, 64);
+  assert.equal(filter.$or[0].unsubscribeToken.length, 64);
+  assert.equal(filter.$or[1].unsubscribeToken, token);
   assert.equal(update.$set.active, false);
   assert.equal(update.$unset.unsubscribeToken, 1);
   assert.match(res.body.message, /unsubscribed/);

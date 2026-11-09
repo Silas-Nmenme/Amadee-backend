@@ -16,7 +16,7 @@ const schema = z.object({
 });
 
 const unsubscribeSchema = z.object({
-  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  token: z.string().regex(/^(?:[A-Za-z0-9_-]{43}|[a-fA-F0-9]{64})$/),
 });
 
 router.post(

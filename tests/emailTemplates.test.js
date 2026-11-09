@@ -9,6 +9,7 @@ import {
   contactNotificationEmail,
   contactReceiptEmail,
   loginAlertEmail,
+  newsletterCampaignEmail,
   newsletterNotificationEmail,
   newsletterUnsubscribeEmail,
   newsletterWelcomeEmail,
@@ -93,6 +94,7 @@ const templates = [
   })],
   ["contact receipt", () => contactReceiptEmail({ name: user.name, messageId: "message-123" })],
   ["newsletter welcome", () => newsletterWelcomeEmail(user.email, "test-unsubscribe-token")],
+  ["newsletter campaign", () => newsletterCampaignEmail({ subject: "New collection", message: "Hello <everyone>\nSee what is new.", unsubscribeToken: "a".repeat(64) })],
   ["newsletter unsubscribe", () => newsletterUnsubscribeEmail(user.email)],
   ["admin newsletter", () => newsletterNotificationEmail(user.email)],
   ["payment attempt failed", () => paymentAttemptFailedEmail(order)],
@@ -162,6 +164,18 @@ test("new account, contact, unsubscribe, and payment notices include safe detail
   assert.match(contactReceiptEmail({ name: user.name, messageId: "message-123" }).html, /message-123/);
   assert.match(newsletterUnsubscribeEmail(user.email).text, /unsubscribed/);
   assert.match(paymentAttemptFailedEmail(order).html, /AS-TEST-123/);
+});
+
+test("newsletter campaign escapes author content and includes recipient unsubscribe URL", () => {
+  const template = newsletterCampaignEmail({
+    subject: "New collection",
+    message: "Hello <everyone>\nSee what is new.",
+    unsubscribeToken: "a".repeat(64),
+  });
+  assert.equal(template.subject, "New collection");
+  assert.match(template.html, /Hello &lt;everyone&gt;<br>See what is new\./);
+  assert.match(template.html, /unsubscribe\.html\?token=a{64}/);
+  assert.match(template.text, /Hello <everyone>/);
 });
 
 test("best-effort notifications report SMTP configuration failures without throwing", async () => {
